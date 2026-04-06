@@ -34,11 +34,10 @@ describe("createImsgWatchHost", () => {
         "--participants",
         "+8613800000000"
       ],
-      spawnProcess,
-      onChunk
+      spawnProcess
     });
 
-    host.start();
+    host.start({ onChunk });
     fakeChild.stdout.emit("data", Buffer.from('{"id":"m1"}\n'));
 
     expect(spawnProcess).toHaveBeenCalledWith("/opt/homebrew/bin/imsg", [
@@ -57,10 +56,9 @@ describe("createImsgWatchHost", () => {
       executablePath: "/opt/homebrew/bin/imsg",
       watchArgs: ["watch", "--json"],
       spawnProcess: () => fakeChild.process,
-      onChunk: () => {}
     });
 
-    const session = host.start();
+    const session = host.start({ onChunk: () => {} });
     session.close();
 
     expect(fakeChild.kill).toHaveBeenCalledTimes(1);
