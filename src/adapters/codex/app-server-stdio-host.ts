@@ -1,0 +1,75 @@
+import { spawn } from "node:child_process";
+
+import { createStdioJsonRpc } from "../../transport/stdio-json-rpc.js";
+
+type WritableProcessStdin = {
+  write: (chunk: string, callback?: (error?: Error | null) => void) => boolean;
+};
+
+type EventedProcessStdout = {
+  on: (event: "data", listener: (chunk: Buffer | string) => void) => unknown;
+};
+
+type SpawnedProcess = {
+  stdin: WritableProcessStdin;
+  stdout: EventedProcessStdout;
+  stderr: unknown;
+  kill: () => void;
+};
+
+type SpawnProcess = (command: string, args: string[]) => SpawnedProcess;
+
+type CreateAppServerStdioHostOptions = {
+  command?: string;
+  args?: string[];
+  spawnProcess?: SpawnProcess;
+  nextRequestId?: () => number;
+};
+
+export function createAppServerStdioHost(
+  options: CreateAppServerStdioHostOptions = {}
+) {
+  const spawnProcess = options.spawnProcess ?? defaultSpawnProcess;
+  const command = options.command ?? "codex";
+  const args = options.args ?? ["app-server", "--listen", "stdio://"];
+
+  return {
+    start() {
+      const childProcess = spawnProcess(command, args);
+      const transport = createStdioJsonRpc({
+        writeChunk: (chunk) =>
+          new Promise<void>((resolve, reject) => {
+            childProcess.stdin.write(chunk, (error) => {
+              if (error) {
+                reject(error);
+                return;
+              }
+
+              resolve();
+            });
+          }),
+        nextRequestId: options.nextRequestId
+      });
+
+      childProcess.stdout.on("data", (chunk: Buffer | string) => {
+        transport.pushStdoutChunk(chunk.toString());
+      });
+
+      return {
+        request(method: string, params?: unknown): Promise<unknown> {
+          return transport.request(method, params);
+        },
+
+        close(): void {
+          childProcess.kill();
+        }
+      };
+    }
+  };
+}
+
+function defaultSpawnProcess(command: string, args: string[]) {
+  return spawn(command, args, {
+    stdio: ["pipe", "pipe", "pipe"]
+  });
+}
