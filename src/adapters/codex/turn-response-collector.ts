@@ -16,7 +16,8 @@ type TurnCompletedNotification = {
 type PendingTurn = {
   threadId: string;
   text: string;
-  resolve: (value: CompletedTurnResult) => void;
+  status: string | null;
+  resolve?: (value: CompletedTurnResult) => void;
 };
 
 export type CompletedTurnResult = {
@@ -32,9 +33,28 @@ export function createTurnResponseCollector() {
   return {
     waitForTurn(params: { threadId: string; turnId: string }): Promise<CompletedTurnResult> {
       return new Promise<CompletedTurnResult>((resolve) => {
+        const existingTurn = pendingTurns.get(params.turnId);
+
+        if (existingTurn) {
+          existingTurn.resolve = resolve;
+
+          if (existingTurn.status) {
+            pendingTurns.delete(params.turnId);
+            resolve({
+              threadId: existingTurn.threadId,
+              turnId: params.turnId,
+              status: existingTurn.status,
+              text: existingTurn.text
+            });
+          }
+
+          return;
+        }
+
         pendingTurns.set(params.turnId, {
           threadId: params.threadId,
           text: "",
+          status: null,
           resolve
         });
       });
@@ -49,6 +69,11 @@ export function createTurnResponseCollector() {
         const pendingTurn = pendingTurns.get(params.turnId);
 
         if (!pendingTurn) {
+          pendingTurns.set(params.turnId, {
+            threadId: params.threadId,
+            text: params.delta,
+            status: null
+          });
           return;
         }
 
@@ -61,6 +86,16 @@ export function createTurnResponseCollector() {
         const pendingTurn = pendingTurns.get(params.turn.id);
 
         if (!pendingTurn) {
+          pendingTurns.set(params.turn.id, {
+            threadId: params.threadId,
+            text: "",
+            status: params.turn.status
+          });
+          return;
+        }
+
+        if (!pendingTurn.resolve) {
+          pendingTurn.status = params.turn.status;
           return;
         }
 

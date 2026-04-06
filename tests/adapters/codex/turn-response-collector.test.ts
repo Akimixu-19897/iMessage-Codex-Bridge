@@ -81,4 +81,40 @@ describe("createTurnResponseCollector", () => {
       text: ""
     });
   });
+
+  test("replays buffered notifications that arrived before waitForTurn", async () => {
+    const collector = createTurnResponseCollector();
+
+    collector.handleNotification({
+      method: "item/agentMessage/delta",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        itemId: "item-1",
+        delta: "先到的内容"
+      }
+    });
+    collector.handleNotification({
+      method: "turn/completed",
+      params: {
+        threadId: "thread-1",
+        turn: {
+          id: "turn-1",
+          status: "completed"
+        }
+      }
+    });
+
+    await expect(
+      collector.waitForTurn({
+        threadId: "thread-1",
+        turnId: "turn-1"
+      })
+    ).resolves.toEqual({
+      threadId: "thread-1",
+      turnId: "turn-1",
+      status: "completed",
+      text: "先到的内容"
+    });
+  });
 });
