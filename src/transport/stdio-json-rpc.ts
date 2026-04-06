@@ -1,8 +1,14 @@
 import { createJsonRpcClient } from "./json-rpc-client.js";
 
+export type JsonRpcNotification = {
+  method: string;
+  params?: unknown;
+};
+
 type CreateStdioJsonRpcOptions = {
   writeChunk: (chunk: string) => Promise<void>;
   nextRequestId?: () => number;
+  onNotification?: (notification: JsonRpcNotification) => void;
 };
 
 export function createStdioJsonRpc(options: CreateStdioJsonRpcOptions) {
@@ -27,6 +33,19 @@ export function createStdioJsonRpc(options: CreateStdioJsonRpcOptions) {
         const trimmedLine = line.trim();
 
         if (!trimmedLine) {
+          continue;
+        }
+
+        const parsedMessage = JSON.parse(trimmedLine) as {
+          method?: string;
+          params?: unknown;
+        };
+
+        if (parsedMessage.method) {
+          options.onNotification?.({
+            method: parsedMessage.method,
+            params: parsedMessage.params
+          });
           continue;
         }
 

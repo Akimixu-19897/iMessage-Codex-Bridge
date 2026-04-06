@@ -76,4 +76,24 @@ describe("createStdioJsonRpc", () => {
       "JSON-RPC -32001: resume failed"
     );
   });
+
+  test("forwards notification messages to the notification handler", async () => {
+    const onNotification = vi.fn();
+    const transport = createStdioJsonRpc({
+      writeChunk: async () => {},
+      onNotification
+    });
+
+    transport.pushStdoutChunk(
+      '{"method":"item/agentMessage/delta","params":{"turnId":"turn-1","delta":"你好"}}\n'
+    );
+
+    expect(onNotification).toHaveBeenCalledWith({
+      method: "item/agentMessage/delta",
+      params: {
+        turnId: "turn-1",
+        delta: "你好"
+      }
+    });
+  });
 });
