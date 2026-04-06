@@ -40,4 +40,66 @@ describe("createImsgClient", () => {
       executablePath: null
     });
   });
+
+  test("builds watch arguments for attachments and participants", () => {
+    const client = createImsgClient({
+      runCommand: async (): Promise<CommandRunnerResult> => ({
+        exitCode: 0,
+        stdout: "",
+        stderr: ""
+      })
+    });
+
+    expect(
+      client.buildWatchArgs({
+        attachments: true,
+        participants: ["+8613800000000", "+8613900000000"],
+        sinceRowId: 123
+      })
+    ).toEqual([
+      "watch",
+      "--json",
+      "--attachments",
+      "--since-rowid",
+      "123",
+      "--participants",
+      "+8613800000000,+8613900000000"
+    ]);
+  });
+
+  test("sends a text message through imsg send", async () => {
+    const calls: string[][] = [];
+    const client = createImsgClient({
+      runCommand: async (command, args): Promise<CommandRunnerResult> => {
+        calls.push([command, ...args]);
+        return {
+          exitCode: 0,
+          stdout: '{"ok":true}',
+          stderr: ""
+        };
+      }
+    });
+
+    const result = await client.sendTextMessage({
+      to: "+8613800000000",
+      text: "你好"
+    });
+
+    expect(calls).toEqual([
+      [
+        "imsg",
+        "send",
+        "--to",
+        "+8613800000000",
+        "--text",
+        "你好",
+        "--json"
+      ]
+    ]);
+    expect(result).toEqual({
+      exitCode: 0,
+      stdout: '{"ok":true}',
+      stderr: ""
+    });
+  });
 });
