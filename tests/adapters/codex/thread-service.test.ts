@@ -30,7 +30,8 @@ describe("createThreadService", () => {
     const service = createThreadService({
       appServerClient: {
         startThread,
-        resumeThread
+        resumeThread,
+        startTurn: vi.fn()
       },
       sessionManager,
       saveState,
@@ -74,7 +75,8 @@ describe("createThreadService", () => {
     const service = createThreadService({
       appServerClient: {
         startThread,
-        resumeThread
+        resumeThread,
+        startTurn: vi.fn()
       },
       sessionManager,
       saveState,
@@ -107,7 +109,8 @@ describe("createThreadService", () => {
     const service = createThreadService({
       appServerClient: {
         startThread: vi.fn(),
-        resumeThread: vi.fn()
+        resumeThread: vi.fn(),
+        startTurn: vi.fn()
       },
       sessionManager: createSessionManager(createInitialBridgeState(TEST_CONFIG))
     });

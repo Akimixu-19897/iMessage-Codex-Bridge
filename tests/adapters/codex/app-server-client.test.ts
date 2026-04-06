@@ -100,4 +100,49 @@ describe("createCodexAppServerClient", () => {
       }
     });
   });
+
+  test("sends a turn/start request with text input items", async () => {
+    const invokeRequest = vi.fn(async () => ({
+      turn: {
+        id: "turn-1",
+        status: "inProgress"
+      }
+    }));
+    const client = createCodexAppServerClient({
+      invokeRequest,
+      nextRequestId: () => 44
+    });
+
+    await expect(
+      client.startTurn({
+        threadId: "thread-1",
+        cwd: "/tmp/workspace-a",
+        input: [
+          {
+            type: "text",
+            text: "你好，Codex"
+          }
+        ]
+      })
+    ).resolves.toEqual({
+      id: "turn-1",
+      status: "inProgress"
+    });
+
+    expect(invokeRequest).toHaveBeenCalledWith({
+      id: 44,
+      method: "turn/start",
+      params: {
+        threadId: "thread-1",
+        cwd: "/tmp/workspace-a",
+        input: [
+          {
+            type: "text",
+            text: "你好，Codex",
+            text_elements: []
+          }
+        ]
+      }
+    });
+  });
 });
