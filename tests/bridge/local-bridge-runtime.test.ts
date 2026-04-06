@@ -1,4 +1,4 @@
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -23,6 +23,8 @@ describe("createLocalBridgeRuntime", () => {
   test("assembles bridge -> codex -> outbound delivery into one runtime", async () => {
     const state = createInitialBridgeState(TEST_CONFIG);
     const stateDirectory = await mkdtemp(join(tmpdir(), "bridge-runtime-"));
+    const sourceImagePath = join(stateDirectory, "input-image.png");
+    await writeFile(sourceImagePath, "image-bytes", "utf8");
     const sendTextMessage = vi.fn(async () => ({
       exitCode: 0,
       stdout: '{"ok":true}',
@@ -82,7 +84,7 @@ describe("createLocalBridgeRuntime", () => {
     });
 
     runtime.app.processImsgChunk(
-      '{"id":"m1","chatId":"chat-1","sender":{"handle":"+8613800000000"},"text":"你好","timestamp":1000,"attachments":[]}\n'
+      `{"id":"m1","chatId":"chat-1","sender":{"handle":"+8613800000000"},"text":"你好","timestamp":1000,"attachments":[{"path":"${sourceImagePath}"}]}\n`
     );
 
     await expect(runtime.app.dispatchReadyActions(7000)).resolves.toEqual([
@@ -106,9 +108,23 @@ describe("createLocalBridgeRuntime", () => {
           type: "text",
           text: "你好",
           text_elements: []
+        },
+        {
+          type: "localImage",
+          path: expect.stringContaining("input-image.png")
         }
       ]
     });
+    expect(state.attachments).toHaveLength(1);
+    expect(state.attachments[0]).toMatchObject({
+      handle: "+8613800000000",
+      messageId: "m1",
+      threadId: "thread-1",
+      sourcePath: sourceImagePath
+    });
+    await expect(readFile(state.attachments[0]!.stagedPath, "utf8")).resolves.toBe(
+      "image-bytes"
+    );
     expect(sendTextMessage).toHaveBeenCalledWith({
       to: "+8613800000000",
       text: "这是 Codex 的回复"

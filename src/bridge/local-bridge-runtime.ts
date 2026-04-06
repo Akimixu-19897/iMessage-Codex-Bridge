@@ -1,7 +1,10 @@
+import { dirname, join } from "node:path";
+
 import { createCodexAppServerClient } from "../adapters/codex/app-server-client.js";
 import { createThreadService } from "../adapters/codex/thread-service.js";
 import { createTurnResponseCollector } from "../adapters/codex/turn-response-collector.js";
 import { createTurnService } from "../adapters/codex/turn-service.js";
+import { stageAttachments } from "../attachments/stage-attachments.js";
 import type { BridgeConfig } from "../config/schema.js";
 import { createSessionManager } from "../state/session-manager.js";
 import type { BridgeState } from "../state/state-store.js";
@@ -19,6 +22,7 @@ type CreateLocalBridgeRuntimeOptions = {
   state: BridgeState;
   statePath: string;
   appServerSession: AppServerSession;
+  attachmentDirectory?: string;
   sendTextMessage: (params: {
     to: string;
     text: string;
@@ -32,6 +36,9 @@ type CreateLocalBridgeRuntimeOptions = {
 export function createLocalBridgeRuntime(
   options: CreateLocalBridgeRuntimeOptions
 ) {
+  const attachmentDirectory =
+    options.attachmentDirectory ??
+    join(dirname(options.statePath), "attachments");
   const turnResponseCollector = createTurnResponseCollector();
   const sessionManager = createSessionManager(options.state);
   const saveState = () =>
@@ -56,11 +63,44 @@ export function createLocalBridgeRuntime(
     threadService
   });
   const bridgeCodexExecutor = createBridgeCodexExecutor({
-    submitTextTurn: ({ handle, text }) =>
-      turnService.submitTextTurn({
+    submitTextTurn: async ({ handle, text, imagePaths, messageIds }) => {
+      let stagedAttachments: Awaited<ReturnType<typeof stageAttachments>> = [];
+
+      if (imagePaths && imagePaths.length > 0 && messageIds && messageIds.length > 0) {
+        try {
+          stagedAttachments = await stageAttachments({
+            handle,
+            messageId: messageIds[messageIds.length - 1]!,
+            attachmentPaths: imagePaths,
+            stagingDirectory: attachmentDirectory
+          });
+        } catch {
+          stagedAttachments = [];
+        }
+      }
+
+      const submittedTurn = await turnService.submitTextTurn({
         handle,
-        text
-      }),
+        text,
+        imagePaths: stagedAttachments.map((attachment) => attachment.stagedPath)
+      });
+
+      if (stagedAttachments.length > 0) {
+        options.state.attachments.push(
+          ...stagedAttachments.map((attachment) => ({
+            messageId: attachment.messageId,
+            handle,
+            threadId: submittedTurn.threadId,
+            sourcePath: attachment.sourcePath,
+            stagedPath: attachment.stagedPath,
+            createdAt: attachment.createdAt
+          }))
+        );
+        await saveState();
+      }
+
+      return submittedTurn;
+    },
     waitForTurn: ({ threadId, turnId }) =>
       turnResponseCollector.waitForTurn({
         threadId,

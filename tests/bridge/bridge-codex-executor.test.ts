@@ -69,7 +69,8 @@ describe("createBridgeCodexExecutor", () => {
     expect(submitTextTurn).toHaveBeenCalledWith({
       handle: "+8613800000000",
       text: "第一句\n第二句",
-      imagePaths: []
+      imagePaths: [],
+      messageIds: ["m1", "m2"]
     });
     expect(waitForTurn).toHaveBeenCalledWith({
       threadId: "thread-1",
@@ -143,7 +144,8 @@ describe("createBridgeCodexExecutor", () => {
     expect(submitTextTurn).toHaveBeenCalledWith({
       handle: "+8613800000000",
       text: "看看图片",
-      imagePaths: ["/tmp/staged-image-a.png", "/tmp/staged-image-b.jpg"]
+      imagePaths: ["/tmp/staged-image-a.png", "/tmp/staged-image-b.jpg"],
+      messageIds: ["m-image"]
     });
   });
 });

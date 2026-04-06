@@ -18,6 +18,7 @@ type CreateBridgeCodexExecutorOptions = {
     handle: string;
     text: string;
     imagePaths?: string[];
+    messageIds?: string[];
   }) => Promise<{
     threadId: string;
     turn: {
@@ -66,7 +67,8 @@ async function executeSubmitAction(
     const submittedTurn = await options.submitTextTurn({
       handle: action.batch.handle,
       text: action.batch.text,
-      imagePaths: action.batch.attachments
+      imagePaths: action.batch.attachments,
+      messageIds: action.batch.messageIds
     });
     const completedTurn = await options.waitForTurn({
       threadId: submittedTurn.threadId,
