@@ -1,0 +1,43 @@
+import { describe, expect, test } from "vitest";
+
+import {
+  createImsgClient,
+  type CommandRunnerResult
+} from "../../../src/adapters/imsg/imsg-client.js";
+
+describe("createImsgClient", () => {
+  test("reports imsg as available when lookup succeeds", async () => {
+    const calls: string[][] = [];
+    const client = createImsgClient({
+      runCommand: async (command, args): Promise<CommandRunnerResult> => {
+        calls.push([command, ...args]);
+        return {
+          exitCode: 0,
+          stdout: "/usr/local/bin/imsg\n",
+          stderr: ""
+        };
+      }
+    });
+
+    await expect(client.detectAvailability()).resolves.toEqual({
+      available: true,
+      executablePath: "/usr/local/bin/imsg"
+    });
+    expect(calls).toEqual([["which", "imsg"]]);
+  });
+
+  test("reports imsg as unavailable when lookup fails", async () => {
+    const client = createImsgClient({
+      runCommand: async (): Promise<CommandRunnerResult> => ({
+        exitCode: 1,
+        stdout: "",
+        stderr: "imsg not found"
+      })
+    });
+
+    await expect(client.detectAvailability()).resolves.toEqual({
+      available: false,
+      executablePath: null
+    });
+  });
+});
