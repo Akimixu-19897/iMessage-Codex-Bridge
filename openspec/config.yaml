@@ -1,0 +1,20 @@
+schema: spec-driven
+
+context: |
+  项目：单机 macOS 上的本地 iMessage 编码代理桥接系统
+  目标：在本机接收 iMessage 消息，将消息路由给 Codex，并通过 Messages.app 回发结果
+  约束：
+    - 单机本地运行，以自用为主
+    - 优先做成可长期使用的稳定方案，而不是一次性原型
+    - bridge 本身不依赖云端服务编排
+    - Messages 集成依赖本地 macOS 权限与本地工具链
+
+rules:
+  proposal:
+    - 明确写出第一版非目标
+    - 明确写出 macOS 权限前提
+  design:
+    - 保持 Codex 集成层尽量薄
+    - 明确区分第一版与第二版能力
+  tasks:
+    - 每个任务都必须可独立验证

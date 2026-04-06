@@ -1,0 +1,214 @@
+# 设计：local-imessage-bridge
+
+## 概览
+
+系统是一个运行在单台 macOS 机器上的单进程本地 bridge。它通过 `imsg` 监听 iMessage 入站事件，对发送者执行白名单校验，把每个白名单联系人映射到一个持久 Codex 线程，将消息文本和支持的附件输入转发给 Codex，再通过 `imsg` 把响应发回对应会话。
+
+设计仍然避免直接读取 Messages 数据库和过早引入多 provider 抽象，但它不再被定义为一次性 MVP，而是面向长期自用的本地系统，重点支持持久会话、图片输入和显式的联系人策略。
+
+## 架构
+
+bridge 包含五个运行时模块：
+
+- `imsg adapter`：从 `imsg` 读取入站消息事件，完成标准化，并通过 `imsg` 发送出站回复
+- `contact gate`：只放行配置中的白名单联系人，对其他发送者返回固定拒绝文案
+- `message buffer`：在短时间窗口内合并同一联系人的连续消息与附件，再统一提交
+- `attachment stage`：把支持的入站附件复制到本地工作区，并分类为可提交给 Codex 的输入
+- `session manager`：把每个白名单联系人映射到独立的持久 Codex 线程和默认 workspace，并持久化运行状态
+- `codex runner`：把文本和可选图片输入提交给 Codex，并返回文本响应
+
+系统应尽可能保持轻状态。真正需要本地持久化的只有配置、线程标识、已处理消息 ID、附件暂存元数据和诊断信息。
+
+## Codex app-server 集成策略
+
+系统优先参考 `wechat-codex-agent` 的总体思路，但不照搬其平台适配层。对于 Codex 集成，第一优先级是使用 `Codex app-server` 作为持久会话承载面，原因是它比一次性 `codex exec` 更适合长期线程、连续输入和桥接程序复用连接。
+
+建议 bridge 在启动时拉起或连接一个本地 `Codex app-server` 实例，并把它视为唯一的线程运行面。bridge 自身不直接持有大段会话上下文，只保存联系人到 Codex 线程标识的映射关系。真正的对话上下文保存在 Codex 线程内。
+
+在实现上，`codex runner` 需要封装成两层：
+
+- 主路径：`app-server client`，负责创建线程、向已有线程追加消息、等待响应、提取文本输出
+- 降级路径：`codex exec` 或 `codex exec resume`，仅在 `app-server` 不可用时作为恢复手段
+
+这种设计的重点是把“持续会话”能力放在 `app-server`，而不是把 bridge 做成一个自己维护上下文的大聊天机器人。
+
+基于本机导出的 `Codex app-server` 协议，可以确认这一路线是成立的。协议中直接存在 `thread/start`、`thread/resume`、`thread/read`、`thread/fork` 与 `turn/start` 等请求，也存在 `thread/started`、`turn/completed`、`item/agentMessage/delta` 等通知。这说明线程、轮次、流式文本输出在协议中都是一级概念，而不是需要 bridge 自己虚构出来的抽象。
+
+同时，`Thread` 对象本身已经包含 `id`、`cwd`、`path`、`updatedAt` 等字段，`TurnStartParams` 允许对同一线程的后续轮次覆盖 `cwd`，而 `UserInput` 直接支持 `localImage`。这三点意味着：
+
+- 联系人级持久线程可以自然映射到 app-server 的线程模型
+- 联系人级默认 workspace 可以自然映射到线程级或轮次级 `cwd`
+- 本地图片附件可以以 `localImage` 形式提交，不必伪造远程 URL
+
+因此，`Codex app-server` 已不再是待验证方向，而是当前设计的主集成面。
+
+## 线程持久化与联系人映射
+
+线程持久化采用“一联系人一线程”的固定映射，不做共享线程。每个白名单联系人在系统中对应一条配置记录，记录中至少包含：
+
+- 联系人唯一标识
+- 联系人显示名
+- 默认 workspace 路径
+- 对应的 Codex 线程 ID
+- 线程最近活跃时间
+
+首次收到某个白名单联系人的消息时，如果还没有对应线程，bridge 应在其默认 workspace 下创建新线程，并把线程 ID 写入本地状态。后续来自该联系人的消息全部进入同一线程。
+
+这种模型可以直接借鉴 `wechat-codex-agent` 的“平台用户映射到持久会话”思想，但这里的主体不是微信用户，而是 iMessage 联系人。这样做的直接收益是：
+
+- 不会把不同联系人的上下文串在一起
+- 每个联系人都能绑定稳定的工作目录
+- 线程恢复时只需要查本地映射，不需要重建对话历史
+
+第二版如果要支持管理员通过 iMessage 动态改绑联系人、切线程、切 workspace，再在这个模型上追加控制命令即可。
+
+## iMessage 图片输入链路
+
+图片链路的目标不是完整多媒体系统，而是让联系人发来的图片可以作为 Codex 的输入被理解。建议处理链路如下：
+
+1. `imsg adapter` 从入站消息中识别附件元数据，并筛出图片类型
+2. `attachment stage` 将图片复制到本地暂存目录，生成稳定的临时文件路径
+3. 该暂存文件与当前联系人、消息 ID、Codex 线程 ID 建立关联
+4. `codex runner` 在向线程追加消息时，把文本与图片文件一起提交给 Codex
+5. Codex 返回文本结果后，bridge 仍然只回发文本，不在第一版尝试生成并发送图片
+
+这里需要特别注意两件事：
+
+- bridge 必须允许附件暂存失败时自动降级为纯文本，不应因此阻断整个会话
+- 图片提交协议必须围绕实际可用的 Codex 输入面来设计，不能假设 `imsg` 附件元数据可以原样透传给 Codex
+
+因此，图片链路的关键不在“收到附件”，而在“把附件落成 Codex 真正可消费的本地输入”。
+
+## 连续消息合并策略
+
+系统第一版应支持短时间窗口内的连续消息合并，目标是适配手机端常见的碎片化输入习惯。对于同一个白名单联系人，如果多条消息在一个较短窗口内连续到达，bridge 不应立即逐条提交给 Codex，而应先进入缓冲区，等窗口结束后一次性提交。
+
+建议第一版采用简单稳定的规则：
+
+- 只对同一联系人生效
+- 只对尚未提交到 Codex 的连续入站消息生效
+- 时间窗口可配置，默认使用一个较短秒级窗口
+- 在窗口内同时合并文本和图片附件
+
+合并后的提交内容应保留原始顺序，避免打乱用户意图。这样既能减少不必要的 Codex 轮次，也能改善持续会话体验。
+
+## 技术栈建议
+
+第一版建议使用 `Node.js + TypeScript` 实现，而不是脚本式拼装。原因如下：
+
+- `imsg` 与 `codex` 都是本机 CLI 或本地协议面，Node.js 适合处理子进程、流式输出与 JSON-RPC 通信
+- `Codex app-server` 已能导出 TypeScript 类型，直接使用 TS 更容易保证协议字段和事件处理不出错
+- bridge 是一个长期运行的本地进程，需要清晰的模块边界、类型系统和较稳定的错误处理，而不是一次性脚本
+- 图片暂存、状态存储、消息缓冲都更适合在一个有明确类型约束的服务进程中实现
+
+建议配套选择如下：
+
+- 语言：`TypeScript`
+- 运行时：`Node.js`
+- 包管理：沿用本机 `volta` 管理下的 `npm`
+- 测试：`Vitest`
+- 本地状态存储：第一版优先 `SQLite`，如需更快起步可先用 `JSON` 文件，但线程映射和去重记录更适合最终落到 SQLite
+- 配置文件：`YAML`
+
+## 项目目录结构建议
+
+建议项目按“bridge 主流程 + app-server 客户端 + 平台适配 + 状态层”分层，避免未来把所有逻辑堆进一个入口文件。可采用以下结构：
+
+```text
+imessage-codex-bridge/
+├── src/
+│   ├── main.ts
+│   ├── config/
+│   │   ├── schema.ts
+│   │   └── load-config.ts
+│   ├── bridge/
+│   │   ├── bridge-service.ts
+│   │   ├── message-buffer.ts
+│   │   ├── contact-policy.ts
+│   │   └── loop-guard.ts
+│   ├── adapters/
+│   │   ├── imsg/
+│   │   │   ├── imsg-client.ts
+│   │   │   └── normalize-message.ts
+│   │   └── codex/
+│   │       ├── app-server-client.ts
+│   │       ├── thread-service.ts
+│   │       └── turn-service.ts
+│   ├── attachments/
+│   │   ├── stage-attachment.ts
+│   │   └── image-input.ts
+│   ├── state/
+│   │   ├── state-store.ts
+│   │   ├── sqlite-state-store.ts
+│   │   └── migrations/
+│   ├── transport/
+│   │   ├── json-rpc-client.ts
+│   │   └── stdio-transport.ts
+│   └── types/
+│       ├── imessage.ts
+│       ├── contact.ts
+│       └── bridge-state.ts
+├── config/
+│   └── bridge.example.yaml
+├── data/
+│   ├── state/
+│   └── attachments/
+├── tests/
+│   ├── unit/
+│   └── integration/
+└── openspec/
+```
+
+这个结构的重点是：
+
+- `transport/` 只关心 JSON-RPC 通信，不掺杂业务逻辑
+- `adapters/codex/` 只关心线程、turn 和 app-server 协议
+- `bridge/` 负责白名单、合并窗口、主流程编排
+- `state/` 负责联系人映射、消息去重和线程绑定
+- `attachments/` 独立处理图片暂存与输入转换，避免污染主流程
+
+如果后续第二版要支持管理员命令、更多 provider 或 Web 控制台，也能在这个结构上自然扩展。
+
+## 数据流
+
+1. `imsg` 发出一条新的入站消息事件
+2. adapter 将原始事件转换为标准化消息对象
+3. `contact gate` 判断发送者是否在白名单中
+4. 如果发送者未获授权，adapter 发送固定拒绝文案并终止处理
+5. 回环保护层判断该消息是否已处理过，或是否来自本机账号自身
+6. `message buffer` 将同一联系人的连续消息暂存到短时间窗口内
+7. `attachment stage` 为窗口内消息准备支持的入站附件，包括图片
+8. `session manager` 解析该发送者对应的独立 Codex 线程和默认 workspace
+9. `codex runner` 在该 workspace 中提交合并后的文本和可选附件输入，并等待响应
+10. adapter 通过 `imsg` 将响应发回原会话
+11. bridge 记录已处理消息 ID 和出站元数据
+
+## 运行时状态
+
+系统需要一个本地状态文件或小型 SQLite 数据库，保存以下记录：
+
+- 白名单联系人配置和拒绝回复文案
+- 每个白名单联系人的独立活跃 Codex 线程
+- 每个白名单联系人的默认 workspace 路径
+- 最近处理过的入站消息 ID
+- 用于回环保护的最近出站消息 ID
+- 附件暂存元数据
+- 用于诊断和恢复的时间戳
+
+状态格式必须足够简单，以便人工检查和修复。
+
+## 故障处理
+
+- 如果启动时 `imsg` 不可用，bridge 直接退出并输出清晰错误
+- 如果 Codex 调用失败，bridge 向白名单联系人返回简短失败提示
+- 如果消息发送失败，bridge 记录日志，并保持该入站消息为已处理状态，避免重复执行
+- 如果本地状态文件损坏，bridge 应快速失败并要求人工修复，而不是自行猜测恢复
+- 如果附件暂存失败，在安全可行时应自动降级为纯文本输入
+
+## 第一版非目标
+
+- 群聊
+- 多个联系人共享同一会话，除非后续明确支持
+- 远程管理界面或 Web UI
+- 第一版支持图片生成和图片回传
+- 第一版通过 iMessage 动态增删白名单或修改 workspace 映射

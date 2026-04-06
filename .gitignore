@@ -1,0 +1,7 @@
+node_modules/
+dist/
+coverage/
+.tmp/
+data/state/
+data/attachments/
+.DS_Store
