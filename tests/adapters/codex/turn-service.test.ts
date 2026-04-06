@@ -78,4 +78,55 @@ describe("createTurnService", () => {
       })
     ).rejects.toThrow("未找到联系人会话映射: +8613900000000");
   });
+
+  test("includes local image items when attachments are provided", async () => {
+    const startTurn = vi.fn(async () => ({
+      id: "turn-2",
+      status: "inProgress"
+    }));
+    const service = createTurnService({
+      appServerClient: {
+        startThread: vi.fn(),
+        resumeThread: vi.fn(),
+        startTurn
+      },
+      threadService: {
+        ensureThread: vi.fn(async () => ({
+          handle: "+8613800000000",
+          workspace: "/tmp/workspace-a",
+          threadId: "thread-1",
+          created: false,
+          thread: {
+            id: "thread-1",
+            cwd: "/tmp/workspace-a"
+          }
+        }))
+      }
+    });
+
+    await service.submitTextTurn({
+      handle: "+8613800000000",
+      text: "看下图",
+      imagePaths: ["/tmp/staged-image-a.png", "/tmp/staged-image-b.jpg"]
+    });
+
+    expect(startTurn).toHaveBeenCalledWith({
+      threadId: "thread-1",
+      cwd: "/tmp/workspace-a",
+      input: [
+        {
+          type: "text",
+          text: "看下图"
+        },
+        {
+          type: "localImage",
+          path: "/tmp/staged-image-a.png"
+        },
+        {
+          type: "localImage",
+          path: "/tmp/staged-image-b.jpg"
+        }
+      ]
+    });
+  });
 });

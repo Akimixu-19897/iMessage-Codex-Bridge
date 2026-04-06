@@ -31,6 +31,9 @@ export type TurnInputItem = {
   type: "text";
   text: string;
   text_elements?: unknown[];
+} | {
+  type: "localImage";
+  path: string;
 };
 
 export type TurnStartParams = {
@@ -63,11 +66,17 @@ export type AppServerRequest =
       method: "turn/start";
       params: {
         threadId: string;
-        input: {
-          type: "text";
-          text: string;
-          text_elements: unknown[];
-        }[];
+        input: (
+          | {
+              type: "text";
+              text: string;
+              text_elements: unknown[];
+            }
+          | {
+              type: "localImage";
+              path: string;
+            }
+        )[];
         cwd?: string;
       };
     };
@@ -129,11 +138,18 @@ export function createCodexAppServerClient(
         method: "turn/start",
         params: {
           threadId: params.threadId,
-          input: params.input.map((item) => ({
-            type: "text" as const,
-            text: item.text,
-            text_elements: item.text_elements ?? []
-          })),
+          input: params.input.map((item) =>
+            item.type === "text"
+              ? {
+                  type: "text" as const,
+                  text: item.text,
+                  text_elements: item.text_elements ?? []
+                }
+              : {
+                  type: "localImage" as const,
+                  path: item.path
+                }
+          ),
           cwd: params.cwd
         }
       });

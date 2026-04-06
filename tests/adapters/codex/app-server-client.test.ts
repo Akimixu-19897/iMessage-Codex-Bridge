@@ -145,4 +145,52 @@ describe("createCodexAppServerClient", () => {
       }
     });
   });
+
+  test("sends localImage input items for staged image paths", async () => {
+    const invokeRequest = vi.fn(async () => ({
+      turn: {
+        id: "turn-2",
+        status: "inProgress"
+      }
+    }));
+    const client = createCodexAppServerClient({
+      invokeRequest,
+      nextRequestId: () => 45
+    });
+
+    await client.startTurn({
+      threadId: "thread-1",
+      cwd: "/tmp/workspace-a",
+      input: [
+        {
+          type: "text",
+          text: "看下这张图"
+        },
+        {
+          type: "localImage",
+          path: "/tmp/staged-image.png"
+        }
+      ]
+    });
+
+    expect(invokeRequest).toHaveBeenCalledWith({
+      id: 45,
+      method: "turn/start",
+      params: {
+        threadId: "thread-1",
+        cwd: "/tmp/workspace-a",
+        input: [
+          {
+            type: "text",
+            text: "看下这张图",
+            text_elements: []
+          },
+          {
+            type: "localImage",
+            path: "/tmp/staged-image.png"
+          }
+        ]
+      }
+    });
+  });
 });

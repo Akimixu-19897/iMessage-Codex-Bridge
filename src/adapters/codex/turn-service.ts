@@ -23,6 +23,7 @@ export function createTurnService(options: CreateTurnServiceOptions) {
     async submitTextTurn(params: {
       handle: string;
       text: string;
+      imagePaths?: string[];
     }): Promise<SubmittedCodexTurn> {
       const resolvedThread = await options.threadService.ensureThread(params.handle);
       const turn = await options.appServerClient.startTurn({
@@ -32,7 +33,11 @@ export function createTurnService(options: CreateTurnServiceOptions) {
           {
             type: "text",
             text: params.text
-          }
+          },
+          ...(params.imagePaths ?? []).map((path) => ({
+            type: "localImage" as const,
+            path
+          }))
         ]
       });
 

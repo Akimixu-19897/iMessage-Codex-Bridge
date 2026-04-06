@@ -68,7 +68,8 @@ describe("createBridgeCodexExecutor", () => {
 
     expect(submitTextTurn).toHaveBeenCalledWith({
       handle: "+8613800000000",
-      text: "第一句\n第二句"
+      text: "第一句\n第二句",
+      imagePaths: []
     });
     expect(waitForTurn).toHaveBeenCalledWith({
       threadId: "thread-1",
@@ -107,5 +108,42 @@ describe("createBridgeCodexExecutor", () => {
         turnId: "unavailable"
       }
     ]);
+  });
+
+  test("passes merged attachment paths to the codex turn submission", async () => {
+    const submitTextTurn = vi.fn(async () => ({
+      threadId: "thread-1",
+      turn: {
+        id: "turn-1",
+        status: "inProgress"
+      }
+    }));
+    const waitForTurn = vi.fn(async () => ({
+      text: "图片已收到",
+      status: "completed"
+    }));
+    const executor = createBridgeCodexExecutor({
+      submitTextTurn,
+      waitForTurn
+    });
+
+    await executor.execute([
+      {
+        type: "submit",
+        batch: {
+          handle: "+8613800000000",
+          messageIds: ["m-image"],
+          text: "看看图片",
+          attachments: ["/tmp/staged-image-a.png", "/tmp/staged-image-b.jpg"],
+          lastReceivedAt: 2000
+        }
+      }
+    ]);
+
+    expect(submitTextTurn).toHaveBeenCalledWith({
+      handle: "+8613800000000",
+      text: "看看图片",
+      imagePaths: ["/tmp/staged-image-a.png", "/tmp/staged-image-b.jpg"]
+    });
   });
 });
