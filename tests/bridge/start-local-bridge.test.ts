@@ -91,4 +91,84 @@ describe("startLocalBridge", () => {
     expect(loopSession.close).toHaveBeenCalledTimes(1);
     expect(appServerSession.close).toHaveBeenCalledTimes(1);
   });
+
+  test("forwards app-server notifications into the local runtime collector", async () => {
+    const handleCodexNotification = vi.fn();
+    const createLocalRuntime = vi.fn(() => ({
+      app: {
+        watchArgs: ["watch", "--json"],
+        processImsgChunk: vi.fn(),
+        drainActions: vi.fn(() => []),
+        executeReadyActions: vi.fn(async () => []),
+        dispatchReadyActions: vi.fn(async () => [])
+      },
+      handleCodexNotification
+    }));
+    let onNotification:
+      | ((notification: { method: string; params?: unknown }) => void)
+      | undefined;
+    const startAppServerHost = vi.fn(() => ({
+      request: vi.fn(async () => ({})),
+      close: vi.fn()
+    }));
+
+    await startLocalBridge({
+      config: {
+        rejectionMessage: "请联系管理员开通权限。",
+        messageMergeWindowMs: 5000,
+        contacts: [
+          {
+            handle: "+8613800000000",
+            name: "联系人 A",
+            workspace: "/tmp/workspace-a"
+          }
+        ]
+      },
+      executablePath: "/opt/homebrew/bin/imsg",
+      statePath: "/tmp/bridge-state.json",
+      loadBridgeState: async () => ({
+        version: 1,
+        contacts: [],
+        processedMessages: [],
+        outboundMessages: [],
+        attachments: []
+      }),
+      createAppServerHost: vi.fn((options) => {
+        onNotification = options.onNotification;
+        return {
+          start: startAppServerHost
+        };
+      }),
+      createLocalRuntime,
+      createImsgWatchHost: vi.fn(() => ({
+        start: vi.fn(() => ({
+          close: vi.fn()
+        }))
+      })),
+      createBridgeLoopRunner: vi.fn(() => ({
+        start: vi.fn(() => ({
+          close: vi.fn()
+        }))
+      })),
+      sendTextMessage: vi.fn(async () => ({
+        exitCode: 0,
+        stdout: "",
+        stderr: ""
+      }))
+    });
+
+    onNotification?.({
+      method: "turn/completed",
+      params: {
+        threadId: "thread-1"
+      }
+    });
+
+    expect(handleCodexNotification).toHaveBeenCalledWith({
+      method: "turn/completed",
+      params: {
+        threadId: "thread-1"
+      }
+    });
+  });
 });

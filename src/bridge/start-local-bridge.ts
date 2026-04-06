@@ -118,6 +118,8 @@ export async function startLocalBridge(options: StartLocalBridgeOptions) {
   const loopSession = loopRunner.start();
 
   return {
+    watchArgs: localRuntime.app.watchArgs,
+
     close(): void {
       loopSession.close();
       appServerSession.close();

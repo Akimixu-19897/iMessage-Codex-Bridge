@@ -26,11 +26,12 @@ describe("runMain", () => {
     expect(log).not.toHaveBeenCalled();
   });
 
-  test("returns exit code 0 and logs readiness when bootstrap succeeds", async () => {
+  test("returns exit code 0, starts the local bridge, and logs readiness when bootstrap succeeds", async () => {
     const log = vi.fn();
     const error = vi.fn();
-    const createApp = vi.fn((config) => ({
-      watchArgs: ["watch", "--json", "--participants", config.contacts[0].handle]
+    const startBridge = vi.fn(async () => ({
+      close: vi.fn(),
+      watchArgs: ["watch", "--json", "--participants", "+8613800000000"]
     }));
 
     const exitCode = await runMain({
@@ -49,40 +50,50 @@ describe("runMain", () => {
           ]
         }
       }),
-      createApp,
+      startBridge,
       log,
       error
     });
 
     expect(exitCode).toBe(0);
-    expect(createApp).toHaveBeenCalledWith({
-      rejectionMessage: "请联系管理员开通权限。",
-      messageMergeWindowMs: 5000,
-      contacts: [
-        {
-          handle: "+8613800000000",
-          name: "测试联系人",
-          workspace: "/tmp/workspace-a"
-        }
-      ]
+    expect(startBridge).toHaveBeenCalledWith({
+      config: {
+        rejectionMessage: "请联系管理员开通权限。",
+        messageMergeWindowMs: 5000,
+        contacts: [
+          {
+            handle: "+8613800000000",
+            name: "测试联系人",
+            workspace: "/tmp/workspace-a"
+          }
+        ]
+      },
+      executablePath: "/opt/homebrew/bin/imsg",
+      statePath: expect.stringContaining("data/bridge-state.json")
     });
-    expect(log).toHaveBeenCalledWith(
-      "bridge ready:",
-      JSON.stringify(
-        {
-          executablePath: "/opt/homebrew/bin/imsg",
-          contactCount: 1,
-          watchArgs: ["watch", "--json", "--participants", "+8613800000000"]
-        },
-        null,
-        2
-      )
-    );
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(log.mock.calls[0]?.[0]).toBe("bridge ready:");
+    expect(JSON.parse(String(log.mock.calls[0]?.[1]))).toEqual({
+      executablePath: "/opt/homebrew/bin/imsg",
+      contactCount: 1,
+      statePath: expect.stringContaining("data/bridge-state.json"),
+      watchArgs: ["watch", "--json", "--participants", "+8613800000000"]
+    });
     expect(error).not.toHaveBeenCalled();
   });
 
-  test("uses the default bridge app factory to expose real watch arguments", async () => {
+  test("uses the provided started bridge metadata when logging readiness", async () => {
     const log = vi.fn();
+    const startBridge = vi.fn(async () => ({
+      close: vi.fn(),
+      watchArgs: [
+        "watch",
+        "--json",
+        "--attachments",
+        "--participants",
+        "+8613800000000,+8613900000000"
+      ]
+    }));
 
     const exitCode = await runMain({
       bootstrap: async () => ({
@@ -105,28 +116,25 @@ describe("runMain", () => {
           ]
         }
       }),
+      startBridge,
       log,
       error: vi.fn()
     });
 
     expect(exitCode).toBe(0);
-    expect(log).toHaveBeenCalledWith(
-      "bridge ready:",
-      JSON.stringify(
-        {
-          executablePath: "/opt/homebrew/bin/imsg",
-          contactCount: 2,
-          watchArgs: [
-            "watch",
-            "--json",
-            "--attachments",
-            "--participants",
-            "+8613800000000,+8613900000000"
-          ]
-        },
-        null,
-        2
-      )
-    );
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(log.mock.calls[0]?.[0]).toBe("bridge ready:");
+    expect(JSON.parse(String(log.mock.calls[0]?.[1]))).toEqual({
+      executablePath: "/opt/homebrew/bin/imsg",
+      contactCount: 2,
+      statePath: expect.stringContaining("data/bridge-state.json"),
+      watchArgs: [
+        "watch",
+        "--json",
+        "--attachments",
+        "--participants",
+        "+8613800000000,+8613900000000"
+      ]
+    });
   });
 });
