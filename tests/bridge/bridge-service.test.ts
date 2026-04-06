@@ -113,4 +113,60 @@ describe("createBridgeService", () => {
       }
     ]);
   });
+
+  test("ignores duplicate inbound message ids", () => {
+    const service = createBridgeService({
+      rejectionMessage: "请联系管理员开通权限。",
+      messageMergeWindowMs: 5000,
+      contacts: [
+        {
+          handle: "+8613800000000",
+          name: "联系人 A",
+          workspace: "/tmp/workspace-a"
+        }
+      ]
+    });
+
+    expect(
+      service.handleIncomingMessage({
+        messageId: "m1",
+        chatId: "chat-1",
+        handle: "+8613800000000",
+        senderName: "联系人 A",
+        text: "第一句",
+        receivedAt: 1000,
+        attachmentPaths: []
+      })
+    ).toEqual({
+      type: "accepted",
+      handle: "+8613800000000"
+    });
+
+    expect(
+      service.handleIncomingMessage({
+        messageId: "m1",
+        chatId: "chat-1",
+        handle: "+8613800000000",
+        senderName: "联系人 A",
+        text: "第一句（重复）",
+        receivedAt: 1200,
+        attachmentPaths: ["/tmp/duplicate.png"]
+      })
+    ).toEqual({
+      type: "ignored",
+      reason: "duplicate",
+      handle: "+8613800000000",
+      messageId: "m1"
+    });
+
+    expect(service.flushReady(7000)).toEqual([
+      {
+        handle: "+8613800000000",
+        messageIds: ["m1"],
+        text: "第一句",
+        attachments: [],
+        lastReceivedAt: 1000
+      }
+    ]);
+  });
 });

@@ -14,11 +14,32 @@ type AcceptedAction = {
   handle: string;
 };
 
-export type HandleIncomingMessageResult = RejectedAction | AcceptedAction;
+type IgnoredAction = {
+  type: "ignored";
+  reason: "duplicate";
+  handle: string;
+  messageId: string;
+};
+
+export type HandleIncomingMessageResult =
+  | RejectedAction
+  | AcceptedAction
+  | IgnoredAction;
 
 export function createBridgeService(config: BridgeConfig) {
   const contactPolicy = createContactPolicy(config);
   const messageBuffer = createMessageBuffer(config.messageMergeWindowMs);
+  const seenMessageIds = new Map<string, number>();
+
+  function pruneSeenMessageIds(now: number): void {
+    const retentionWindowMs = config.messageMergeWindowMs * 20;
+
+    for (const [messageId, receivedAt] of seenMessageIds.entries()) {
+      if (now - receivedAt > retentionWindowMs) {
+        seenMessageIds.delete(messageId);
+      }
+    }
+  }
 
   return {
     buildWatchArgs(): string[] {
@@ -34,6 +55,18 @@ export function createBridgeService(config: BridgeConfig) {
     handleIncomingMessage(
       message: NormalizedInboundMessage
     ): HandleIncomingMessageResult {
+      pruneSeenMessageIds(message.receivedAt);
+
+      if (seenMessageIds.has(message.messageId)) {
+        return {
+          type: "ignored",
+          reason: "duplicate",
+          handle: message.handle,
+          messageId: message.messageId
+        };
+      }
+
+      seenMessageIds.set(message.messageId, message.receivedAt);
       const decision = contactPolicy.evaluate(message.handle);
 
       if (!decision.allowed) {
@@ -59,6 +92,7 @@ export function createBridgeService(config: BridgeConfig) {
     },
 
     flushReady(now: number) {
+      pruneSeenMessageIds(now);
       return messageBuffer.flushReady(now);
     }
   };

@@ -62,4 +62,38 @@ describe("createBridgeRuntime", () => {
       }
     ]);
   });
+
+  test("ignores duplicate imsg message ids when draining actions", () => {
+    const runtime = createBridgeRuntime({
+      rejectionMessage: "请联系管理员开通权限。",
+      messageMergeWindowMs: 5000,
+      contacts: [
+        {
+          handle: "+8613800000000",
+          name: "联系人 A",
+          workspace: "/tmp/workspace-a"
+        }
+      ]
+    });
+
+    runtime.pushImsgChunk(
+      '{"id":"m1","chatId":"chat-1","sender":{"handle":"+8613800000000","displayName":"联系人 A"},"text":"第一句","timestamp":1000,"attachments":[]}\n'
+    );
+    runtime.pushImsgChunk(
+      '{"id":"m1","chatId":"chat-1","sender":{"handle":"+8613800000000","displayName":"联系人 A"},"text":"第一句（重复）","timestamp":1200,"attachments":[{"path":"/tmp/duplicate.png"}]}\n'
+    );
+
+    expect(runtime.drainActions(7000)).toEqual([
+      {
+        type: "submit",
+        batch: {
+          handle: "+8613800000000",
+          messageIds: ["m1"],
+          text: "第一句",
+          attachments: [],
+          lastReceivedAt: 1000
+        }
+      }
+    ]);
+  });
 });
