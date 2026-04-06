@@ -50,7 +50,8 @@ describe("createBridgeService", () => {
       senderName: "陌生人",
       text: "你好",
       receivedAt: 1,
-      attachmentPaths: []
+      attachmentPaths: [],
+      isFromMe: false
     });
 
     expect(result).toEqual({
@@ -81,7 +82,8 @@ describe("createBridgeService", () => {
         senderName: "联系人 A",
         text: "第一句",
         receivedAt: 1000,
-        attachmentPaths: []
+        attachmentPaths: [],
+        isFromMe: false
       })
     ).toEqual({
       type: "accepted",
@@ -96,7 +98,8 @@ describe("createBridgeService", () => {
         senderName: "联系人 A",
         text: "第二句",
         receivedAt: 2000,
-        attachmentPaths: ["/tmp/a.png"]
+        attachmentPaths: ["/tmp/a.png"],
+        isFromMe: false
       })
     ).toEqual({
       type: "accepted",
@@ -135,7 +138,8 @@ describe("createBridgeService", () => {
         senderName: "联系人 A",
         text: "第一句",
         receivedAt: 1000,
-        attachmentPaths: []
+        attachmentPaths: [],
+        isFromMe: false
       })
     ).toEqual({
       type: "accepted",
@@ -150,7 +154,8 @@ describe("createBridgeService", () => {
         senderName: "联系人 A",
         text: "第一句（重复）",
         receivedAt: 1200,
-        attachmentPaths: ["/tmp/duplicate.png"]
+        attachmentPaths: ["/tmp/duplicate.png"],
+        isFromMe: false
       })
     ).toEqual({
       type: "ignored",
@@ -168,5 +173,39 @@ describe("createBridgeService", () => {
         lastReceivedAt: 1000
       }
     ]);
+  });
+
+  test("ignores self-originated outbound messages", () => {
+    const service = createBridgeService({
+      rejectionMessage: "请联系管理员开通权限。",
+      messageMergeWindowMs: 5000,
+      contacts: [
+        {
+          handle: "+8613800000000",
+          name: "联系人 A",
+          workspace: "/tmp/workspace-a"
+        }
+      ]
+    });
+
+    expect(
+      service.handleIncomingMessage({
+        messageId: "m-self",
+        chatId: "chat-1",
+        handle: "+8613800000000",
+        senderName: "我自己",
+        text: "这是 bridge 刚发出的回复",
+        receivedAt: 1000,
+        attachmentPaths: [],
+        isFromMe: true
+      })
+    ).toEqual({
+      type: "ignored",
+      reason: "self",
+      handle: "+8613800000000",
+      messageId: "m-self"
+    });
+
+    expect(service.flushReady(7000)).toEqual([]);
   });
 });

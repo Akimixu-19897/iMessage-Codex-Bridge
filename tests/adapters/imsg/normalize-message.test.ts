@@ -23,7 +23,8 @@ describe("normalizeImsgMessage", () => {
       senderName: "测试联系人",
       text: "你好，Codex",
       receivedAt: 1710000000,
-      attachmentPaths: []
+      attachmentPaths: [],
+      isFromMe: false
     });
   });
 
@@ -55,7 +56,39 @@ describe("normalizeImsgMessage", () => {
       senderName: null,
       text: "帮我看看这张图",
       receivedAt: 1710000001,
-      attachmentPaths: ["/tmp/image-a.png", "/tmp/image-b.jpg"]
+      attachmentPaths: ["/tmp/image-a.png", "/tmp/image-b.jpg"],
+      isFromMe: false
+    });
+  });
+
+  test("normalizes real imsg json fields including self-message marker", () => {
+    const normalized = normalizeImsgMessage({
+      guid: "message-3",
+      chat_id: 42,
+      sender: {
+        handle: "+8613900000000",
+        display_name: "联系人 B"
+      },
+      text: "这是我发出的消息",
+      created_at: "2026-04-07T07:00:00.000Z",
+      is_from_me: true,
+      attachments: [
+        {
+          original_path: "/tmp/camera-roll.png",
+          mime_type: "image/png"
+        }
+      ]
+    } as any);
+
+    expect(normalized).toEqual({
+      messageId: "message-3",
+      chatId: "42",
+      handle: "+8613900000000",
+      senderName: "联系人 B",
+      text: "这是我发出的消息",
+      receivedAt: Date.parse("2026-04-07T07:00:00.000Z"),
+      attachmentPaths: ["/tmp/camera-roll.png"],
+      isFromMe: true
     });
   });
 });

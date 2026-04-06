@@ -26,7 +26,8 @@ describe("createImsgJsonStreamParser", () => {
         senderName: null,
         text: "第一条",
         receivedAt: 1,
-        attachmentPaths: []
+        attachmentPaths: [],
+        isFromMe: false
       },
       {
         messageId: "m2",
@@ -35,7 +36,8 @@ describe("createImsgJsonStreamParser", () => {
         senderName: "测试联系人",
         text: "第二条",
         receivedAt: 2,
-        attachmentPaths: ["/tmp/a.png"]
+        attachmentPaths: ["/tmp/a.png"],
+        isFromMe: false
       }
     ]);
   });
@@ -58,7 +60,8 @@ describe("createImsgJsonStreamParser", () => {
         senderName: null,
         text: "唯一消息",
         receivedAt: 1,
-        attachmentPaths: []
+        attachmentPaths: [],
+        isFromMe: false
       }
     ]);
   });

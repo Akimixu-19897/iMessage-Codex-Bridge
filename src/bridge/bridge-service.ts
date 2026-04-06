@@ -16,7 +16,7 @@ type AcceptedAction = {
 
 type IgnoredAction = {
   type: "ignored";
-  reason: "duplicate";
+  reason: "duplicate" | "self";
   handle: string;
   messageId: string;
 };
@@ -56,6 +56,15 @@ export function createBridgeService(config: BridgeConfig) {
       message: NormalizedInboundMessage
     ): HandleIncomingMessageResult {
       pruneSeenMessageIds(message.receivedAt);
+
+      if (message.isFromMe) {
+        return {
+          type: "ignored",
+          reason: "self",
+          handle: message.handle,
+          messageId: message.messageId
+        };
+      }
 
       if (seenMessageIds.has(message.messageId)) {
         return {
