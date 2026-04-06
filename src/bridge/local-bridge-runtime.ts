@@ -23,6 +23,7 @@ type CreateLocalBridgeRuntimeOptions = {
   statePath: string;
   appServerSession: AppServerSession;
   attachmentDirectory?: string;
+  logError?: (...args: unknown[]) => void;
   sendTextMessage: (params: {
     to: string;
     text: string;
@@ -39,6 +40,7 @@ export function createLocalBridgeRuntime(
   const attachmentDirectory =
     options.attachmentDirectory ??
     join(dirname(options.statePath), "attachments");
+  const logError = options.logError ?? console.error;
   const turnResponseCollector = createTurnResponseCollector();
   const sessionManager = createSessionManager(options.state);
   const saveState = () =>
@@ -74,7 +76,11 @@ export function createLocalBridgeRuntime(
             attachmentPaths: imagePaths,
             stagingDirectory: attachmentDirectory
           });
-        } catch {
+        } catch (error) {
+          logError(
+            "bridge attachment staging failed, falling back to text-only turn:",
+            error
+          );
           stagedAttachments = [];
         }
       }
@@ -109,7 +115,8 @@ export function createLocalBridgeRuntime(
     codexUnavailableMessage: "抱歉，Codex 暂时不可用，请稍后再试。"
   });
   const bridgeOutboundDispatcher = createBridgeOutboundDispatcher({
-    sendTextMessage: options.sendTextMessage
+    sendTextMessage: options.sendTextMessage,
+    logError
   });
   const app = createBridgeApp(options.config, {
     executeRuntimeActions: (actions) => bridgeCodexExecutor.execute(actions),

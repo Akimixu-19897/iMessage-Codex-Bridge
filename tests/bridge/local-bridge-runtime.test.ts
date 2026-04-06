@@ -131,4 +131,81 @@ describe("createLocalBridgeRuntime", () => {
     });
     expect(state.contacts[0]?.threadId).toBe("thread-1");
   });
+
+  test("logs attachment staging failures and falls back to text-only turns", async () => {
+    const state = createInitialBridgeState(TEST_CONFIG);
+    const stateDirectory = await mkdtemp(join(tmpdir(), "bridge-runtime-"));
+    const logError = vi.fn();
+    const request = vi.fn(async (method: string) => {
+      if (method === "thread/start") {
+        return {
+          thread: {
+            id: "thread-1",
+            cwd: "/tmp/workspace-a"
+          }
+        };
+      }
+
+      if (method === "turn/start") {
+        queueMicrotask(() => {
+          runtime.handleCodexNotification({
+            method: "turn/completed",
+            params: {
+              threadId: "thread-1",
+              turn: {
+                id: "turn-1",
+                status: "completed"
+              }
+            }
+          });
+        });
+
+        return {
+          turn: {
+            id: "turn-1",
+            status: "inProgress"
+          }
+        };
+      }
+
+      throw new Error(`unexpected method: ${method}`);
+    });
+    const runtime = createLocalBridgeRuntime({
+      config: TEST_CONFIG,
+      state,
+      statePath: join(stateDirectory, "bridge-state.json"),
+      appServerSession: {
+        request
+      },
+      sendTextMessage: vi.fn(async () => ({
+        exitCode: 0,
+        stdout: "",
+        stderr: ""
+      })),
+      logError
+    });
+
+    runtime.app.processImsgChunk(
+      '{"id":"m1","chatId":"chat-1","sender":{"handle":"+8613800000000"},"text":"你好","timestamp":1000,"attachments":[{"path":"/tmp/missing-image.png"}]}\n'
+    );
+
+    await runtime.app.dispatchReadyActions(7000);
+
+    expect(request).toHaveBeenNthCalledWith(2, "turn/start", {
+      threadId: "thread-1",
+      cwd: "/tmp/workspace-a",
+      input: [
+        {
+          type: "text",
+          text: "你好",
+          text_elements: []
+        }
+      ]
+    });
+    expect(logError).toHaveBeenCalledWith(
+      "bridge attachment staging failed, falling back to text-only turn:",
+      expect.any(Error)
+    );
+    expect(state.attachments).toEqual([]);
+  });
 });

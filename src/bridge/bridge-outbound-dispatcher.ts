@@ -9,6 +9,7 @@ type CreateBridgeOutboundDispatcherOptions = {
     stdout: string;
     stderr: string;
   }>;
+  logError?: (...args: unknown[]) => void;
 };
 
 export type BridgeOutboundResult = {
@@ -20,6 +21,8 @@ export type BridgeOutboundResult = {
 export function createBridgeOutboundDispatcher(
   options: CreateBridgeOutboundDispatcherOptions
 ) {
+  const logError = options.logError ?? console.error;
+
   return {
     async dispatch(
       actions: BridgeExecutionAction[]
@@ -31,6 +34,14 @@ export function createBridgeOutboundDispatcher(
           to: action.handle,
           text: action.message
         });
+
+        if (sendResult.exitCode !== 0) {
+          logError("bridge outbound send failed:", {
+            handle: action.handle,
+            exitCode: sendResult.exitCode,
+            stderr: sendResult.stderr
+          });
+        }
 
         results.push({
           handle: action.handle,

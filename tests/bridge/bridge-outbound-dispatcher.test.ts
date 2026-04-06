@@ -50,4 +50,43 @@ describe("createBridgeOutboundDispatcher", () => {
       text: "这是 Codex 的回复"
     });
   });
+
+  test("logs send failures but keeps returning the dispatch result", async () => {
+    const logError = vi.fn();
+    const dispatcher = createBridgeOutboundDispatcher({
+      sendTextMessage: vi.fn(async () => ({
+        exitCode: 1,
+        stdout: "",
+        stderr: "send failed"
+      })),
+      logError
+    });
+
+    await expect(
+      dispatcher.dispatch([
+        {
+          type: "reply",
+          handle: "+8613800000000",
+          message: "这是 Codex 的回复",
+          threadId: "thread-1",
+          turnId: "turn-1"
+        }
+      ])
+    ).resolves.toEqual([
+      {
+        handle: "+8613800000000",
+        message: "这是 Codex 的回复",
+        exitCode: 1
+      }
+    ]);
+
+    expect(logError).toHaveBeenCalledWith(
+      "bridge outbound send failed:",
+      expect.objectContaining({
+        handle: "+8613800000000",
+        exitCode: 1,
+        stderr: "send failed"
+      })
+    );
+  });
 });
