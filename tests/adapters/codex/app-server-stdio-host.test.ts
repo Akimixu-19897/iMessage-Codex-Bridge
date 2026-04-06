@@ -92,4 +92,32 @@ describe("createAppServerStdioHost", () => {
     ]);
     expect(fakeChild.kill).toHaveBeenCalledTimes(1);
   });
+
+  test("forwards server notifications from stdout", () => {
+    const fakeChild = createFakeChildProcess();
+    const onNotification = vi.fn();
+    const host = createAppServerStdioHost({
+      spawnProcess: () => fakeChild.process,
+      onNotification
+    });
+
+    host.start();
+    fakeChild.stdout.emit(
+      "data",
+      Buffer.from(
+        '{"method":"turn/completed","params":{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed"}}}\n'
+      )
+    );
+
+    expect(onNotification).toHaveBeenCalledWith({
+      method: "turn/completed",
+      params: {
+        threadId: "thread-1",
+        turn: {
+          id: "turn-1",
+          status: "completed"
+        }
+      }
+    });
+  });
 });

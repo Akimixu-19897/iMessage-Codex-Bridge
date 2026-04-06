@@ -1,6 +1,9 @@
 import { spawn } from "node:child_process";
 
-import { createStdioJsonRpc } from "../../transport/stdio-json-rpc.js";
+import {
+  createStdioJsonRpc,
+  type JsonRpcNotification
+} from "../../transport/stdio-json-rpc.js";
 
 type WritableProcessStdin = {
   write: (chunk: string, callback?: (error?: Error | null) => void) => boolean;
@@ -24,6 +27,7 @@ type CreateAppServerStdioHostOptions = {
   args?: string[];
   spawnProcess?: SpawnProcess;
   nextRequestId?: () => number;
+  onNotification?: (notification: JsonRpcNotification) => void;
 };
 
 export function createAppServerStdioHost(
@@ -48,7 +52,8 @@ export function createAppServerStdioHost(
               resolve();
             });
           }),
-        nextRequestId: options.nextRequestId
+        nextRequestId: options.nextRequestId,
+        onNotification: options.onNotification
       });
 
       childProcess.stdout.on("data", (chunk: Buffer | string) => {
