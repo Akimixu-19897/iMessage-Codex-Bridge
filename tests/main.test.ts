@@ -69,7 +69,8 @@ describe("runMain", () => {
         ]
       },
       executablePath: "/opt/homebrew/bin/imsg",
-      statePath: expect.stringContaining("data/bridge-state.json")
+      statePath: expect.stringContaining("data/bridge-state.json"),
+      attachmentDirectory: expect.stringContaining("data/attachments")
     });
     expect(log).toHaveBeenCalledTimes(1);
     expect(log.mock.calls[0]?.[0]).toBe("bridge ready:");
@@ -77,6 +78,7 @@ describe("runMain", () => {
       executablePath: "/opt/homebrew/bin/imsg",
       contactCount: 1,
       statePath: expect.stringContaining("data/bridge-state.json"),
+      attachmentDirectory: expect.stringContaining("data/attachments"),
       watchArgs: ["watch", "--json", "--participants", "+8613800000000"]
     });
     expect(error).not.toHaveBeenCalled();
@@ -128,6 +130,7 @@ describe("runMain", () => {
       executablePath: "/opt/homebrew/bin/imsg",
       contactCount: 2,
       statePath: expect.stringContaining("data/bridge-state.json"),
+      attachmentDirectory: expect.stringContaining("data/attachments"),
       watchArgs: [
         "watch",
         "--json",

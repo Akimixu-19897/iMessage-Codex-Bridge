@@ -30,4 +30,20 @@ describe("stageAttachments", () => {
     });
     await expect(readFile(staged[0]!.stagedPath, "utf8")).resolves.toBe("image-bytes");
   });
+
+  test("returns no staged files when a batch contains no supported images", async () => {
+    const workspace = await mkdtemp(join(tmpdir(), "stage-attachments-"));
+    const sourceText = join(workspace, "note.txt");
+    await writeFile(sourceText, "ignored", "utf8");
+
+    await expect(
+      stageAttachments({
+        handle: "+8613800000000",
+        messageId: "m2",
+        attachmentPaths: [sourceText],
+        stagingDirectory: join(workspace, "attachments"),
+        now: () => 1710000000001
+      })
+    ).resolves.toEqual([]);
+  });
 });

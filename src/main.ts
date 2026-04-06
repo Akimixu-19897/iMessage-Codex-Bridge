@@ -7,6 +7,8 @@ const DEFAULT_CONFIG_PATH = new URL("../config/bridge.example.yaml", import.meta
   .pathname;
 const DEFAULT_STATE_PATH = new URL("../data/bridge-state.json", import.meta.url)
   .pathname;
+const DEFAULT_ATTACHMENT_DIRECTORY = new URL("../data/attachments", import.meta.url)
+  .pathname;
 
 type RunMainOptions = {
   bootstrap?: () => Promise<BootstrapBridgeResult>;
@@ -14,6 +16,7 @@ type RunMainOptions = {
     config: BridgeConfig;
     executablePath: string;
     statePath: string;
+    attachmentDirectory: string;
   }) => Promise<{
     close(): void;
     watchArgs: string[];
@@ -26,6 +29,7 @@ export async function runMain(options: RunMainOptions = {}): Promise<number> {
   const log = options.log ?? console.log;
   const error = options.error ?? console.error;
   const statePath = DEFAULT_STATE_PATH;
+  const attachmentDirectory = DEFAULT_ATTACHMENT_DIRECTORY;
   const startBridge = options.startBridge ?? startLocalBridge;
   const bootstrap =
     options.bootstrap ??
@@ -49,7 +53,8 @@ export async function runMain(options: RunMainOptions = {}): Promise<number> {
   const bridge = await startBridge({
     config: result.config,
     executablePath: result.executablePath,
-    statePath
+    statePath,
+    attachmentDirectory
   });
 
   log(
@@ -59,6 +64,7 @@ export async function runMain(options: RunMainOptions = {}): Promise<number> {
           executablePath: result.executablePath,
           contactCount: result.config.contacts.length,
           statePath,
+          attachmentDirectory,
           watchArgs: bridge.watchArgs
         },
         null,

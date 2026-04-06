@@ -58,6 +58,7 @@ describe("startLocalBridge", () => {
       config,
       executablePath: "/opt/homebrew/bin/imsg",
       statePath: "/tmp/bridge-state.json",
+      attachmentDirectory: "/tmp/bridge-attachments",
       loadBridgeState,
       createAppServerHost,
       createLocalRuntime,
@@ -75,6 +76,7 @@ describe("startLocalBridge", () => {
       config,
       state,
       statePath: "/tmp/bridge-state.json",
+      attachmentDirectory: "/tmp/bridge-attachments",
       appServerSession,
       sendTextMessage: expect.any(Function)
     });

@@ -36,6 +36,7 @@ type StartLocalBridgeOptions = {
   config: BridgeConfig;
   executablePath: string;
   statePath: string;
+  attachmentDirectory?: string;
   loadBridgeState?: (options: {
     path: string;
     config: BridgeConfig;
@@ -47,6 +48,7 @@ type StartLocalBridgeOptions = {
     config: BridgeConfig;
     state: BridgeState;
     statePath: string;
+    attachmentDirectory?: string;
     appServerSession: AppServerSession;
     sendTextMessage: (params: { to: string; text: string }) => Promise<{
       exitCode: number;
@@ -100,6 +102,7 @@ export async function startLocalBridge(options: StartLocalBridgeOptions) {
     config: options.config,
     state,
     statePath: options.statePath,
+    attachmentDirectory: options.attachmentDirectory,
     appServerSession,
     sendTextMessage
   });
