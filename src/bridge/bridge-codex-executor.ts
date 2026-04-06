@@ -31,6 +31,7 @@ type CreateBridgeCodexExecutorOptions = {
     text: string;
     status: string;
   }>;
+  codexUnavailableMessage?: string;
 };
 
 export function createBridgeCodexExecutor(
@@ -60,20 +61,31 @@ async function executeSubmitAction(
   action: SubmitAction,
   options: CreateBridgeCodexExecutorOptions
 ): Promise<BridgeReplyAction> {
-  const submittedTurn = await options.submitTextTurn({
-    handle: action.batch.handle,
-    text: action.batch.text
-  });
-  const completedTurn = await options.waitForTurn({
-    threadId: submittedTurn.threadId,
-    turnId: submittedTurn.turn.id
-  });
+  try {
+    const submittedTurn = await options.submitTextTurn({
+      handle: action.batch.handle,
+      text: action.batch.text
+    });
+    const completedTurn = await options.waitForTurn({
+      threadId: submittedTurn.threadId,
+      turnId: submittedTurn.turn.id
+    });
 
-  return {
-    type: "reply",
-    handle: action.batch.handle,
-    message: completedTurn.text,
-    threadId: submittedTurn.threadId,
-    turnId: submittedTurn.turn.id
-  };
+    return {
+      type: "reply",
+      handle: action.batch.handle,
+      message: completedTurn.text,
+      threadId: submittedTurn.threadId,
+      turnId: submittedTurn.turn.id
+    };
+  } catch {
+    return {
+      type: "reply",
+      handle: action.batch.handle,
+      message:
+        options.codexUnavailableMessage ?? "抱歉，Codex 暂时不可用，请稍后再试。",
+      threadId: "unavailable",
+      turnId: "unavailable"
+    };
+  }
 }

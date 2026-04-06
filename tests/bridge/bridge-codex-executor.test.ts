@@ -75,4 +75,37 @@ describe("createBridgeCodexExecutor", () => {
       turnId: "turn-1"
     });
   });
+
+  test("returns a user-readable fallback reply when codex execution fails", async () => {
+    const executor = createBridgeCodexExecutor({
+      submitTextTurn: vi.fn(async () => {
+        throw new Error("app-server unavailable");
+      }),
+      waitForTurn: vi.fn(),
+      codexUnavailableMessage: "抱歉，Codex 暂时不可用，请稍后再试。"
+    });
+
+    await expect(
+      executor.execute([
+        {
+          type: "submit",
+          batch: {
+            handle: "+8613800000000",
+            messageIds: ["m1"],
+            text: "你好",
+            attachments: [],
+            lastReceivedAt: 2000
+          }
+        }
+      ])
+    ).resolves.toEqual([
+      {
+        type: "reply",
+        handle: "+8613800000000",
+        message: "抱歉，Codex 暂时不可用，请稍后再试。",
+        threadId: "unavailable",
+        turnId: "unavailable"
+      }
+    ]);
+  });
 });

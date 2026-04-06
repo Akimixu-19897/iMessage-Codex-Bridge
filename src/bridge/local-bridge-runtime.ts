@@ -65,7 +65,8 @@ export function createLocalBridgeRuntime(
       turnResponseCollector.waitForTurn({
         threadId,
         turnId
-      })
+      }),
+    codexUnavailableMessage: "抱歉，Codex 暂时不可用，请稍后再试。"
   });
   const bridgeOutboundDispatcher = createBridgeOutboundDispatcher({
     sendTextMessage: options.sendTextMessage
