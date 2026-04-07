@@ -1,6 +1,7 @@
 import { createImsgJsonStreamParser } from "../adapters/imsg/imsg-json-stream.js";
 import type { BridgeConfig } from "../config/schema.js";
 import { createBridgeService } from "./bridge-service.js";
+import type { ParsedBridgeAdminCommand } from "./admin-command.js";
 
 type RejectAction = {
   type: "reject";
@@ -13,24 +14,42 @@ type SubmitAction = {
   batch: ReturnType<ReturnType<typeof createBridgeService>["flushReady"]>[number];
 };
 
-export type BridgeRuntimeAction = RejectAction | SubmitAction;
+type CommandAction = {
+  type: "command";
+  handle: string;
+  command: ParsedBridgeAdminCommand;
+};
 
-export function createBridgeRuntime(config: BridgeConfig) {
-  const bridgeService = createBridgeService(config);
-  const pendingActions: BridgeRuntimeAction[] = [];
+export type BridgeRuntimeAction = RejectAction | SubmitAction | CommandAction;
+
+type CreateBridgeRuntimeOptions = {
+  contactsProvider?: () => BridgeConfig["contacts"];
+  adminHandles?: string[];
+};
+
+export function createBridgeRuntime(
+  config: BridgeConfig,
+  options: CreateBridgeRuntimeOptions = {}
+) {
+  const bridgeService = createBridgeService(config, options);
+  const pendingActions: Array<RejectAction | CommandAction> = [];
   const streamParser = createImsgJsonStreamParser({
     onMessage: (message) => {
       const result = bridgeService.handleIncomingMessage(message);
 
-      if (result.type === "reject") {
+      if (result.type === "reject" || result.type === "command") {
         pendingActions.push(result);
       }
     }
   });
 
+  const watchArgs = bridgeService.buildWatchArgs();
+
   return {
+    watchArgs,
+
     buildWatchArgs(): string[] {
-      return bridgeService.buildWatchArgs();
+      return watchArgs;
     },
 
     pushImsgChunk(chunk: string): void {

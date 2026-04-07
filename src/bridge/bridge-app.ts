@@ -4,6 +4,8 @@ import type { BridgeConfig } from "../config/schema.js";
 import { createBridgeRuntime } from "./bridge-runtime.js";
 
 type CreateBridgeAppOptions = {
+  contactsProvider?: () => BridgeConfig["contacts"];
+  adminHandles?: string[];
   executeRuntimeActions?: (actions: ReturnType<
     ReturnType<typeof createBridgeRuntime>["drainActions"]
   >) => Promise<BridgeExecutionAction[]>;
@@ -16,10 +18,13 @@ export function createBridgeApp(
   config: BridgeConfig,
   options: CreateBridgeAppOptions = {}
 ) {
-  const runtime = createBridgeRuntime(config);
+  const runtime = createBridgeRuntime(config, {
+    contactsProvider: options.contactsProvider,
+    adminHandles: options.adminHandles
+  });
 
   return {
-    watchArgs: runtime.buildWatchArgs(),
+    watchArgs: runtime.watchArgs,
 
     processImsgChunk(chunk: string): void {
       runtime.pushImsgChunk(chunk);

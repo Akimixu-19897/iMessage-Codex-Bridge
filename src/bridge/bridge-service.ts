@@ -2,6 +2,10 @@ import type { NormalizedInboundMessage } from "../adapters/imsg/normalize-messag
 import type { BridgeConfig } from "../config/schema.js";
 import { createContactPolicy } from "./contact-policy.js";
 import { createMessageBuffer } from "./message-buffer.js";
+import {
+  parseBridgeAdminCommand,
+  type ParsedBridgeAdminCommand
+} from "./admin-command.js";
 
 type RejectedAction = {
   type: "reject";
@@ -14,6 +18,12 @@ type AcceptedAction = {
   handle: string;
 };
 
+type CommandAction = {
+  type: "command";
+  handle: string;
+  command: ParsedBridgeAdminCommand;
+};
+
 type IgnoredAction = {
   type: "ignored";
   reason: "duplicate" | "self";
@@ -24,12 +34,34 @@ type IgnoredAction = {
 export type HandleIncomingMessageResult =
   | RejectedAction
   | AcceptedAction
+  | CommandAction
   | IgnoredAction;
 
-export function createBridgeService(config: BridgeConfig) {
-  const contactPolicy = createContactPolicy(config);
+type CreateBridgeServiceOptions = {
+  contactsProvider?: () => BridgeConfig["contacts"];
+  adminHandles?: string[];
+};
+
+export function createBridgeService(
+  config: BridgeConfig,
+  options: CreateBridgeServiceOptions = {}
+) {
   const messageBuffer = createMessageBuffer(config.messageMergeWindowMs);
   const seenMessageIds = new Map<string, number>();
+  const adminHandles = new Set(
+    options.adminHandles && options.adminHandles.length > 0
+      ? options.adminHandles
+      : config.adminHandles && config.adminHandles.length > 0
+        ? config.adminHandles
+        : config.contacts.map((contact) => contact.handle)
+  );
+
+  function createDynamicContactPolicy() {
+    return createContactPolicy({
+      ...config,
+      contacts: options.contactsProvider?.() ?? config.contacts
+    });
+  }
 
   function pruneSeenMessageIds(now: number): void {
     const retentionWindowMs = config.messageMergeWindowMs * 20;
@@ -43,13 +75,7 @@ export function createBridgeService(config: BridgeConfig) {
 
   return {
     buildWatchArgs(): string[] {
-      return [
-        "watch",
-        "--json",
-        "--attachments",
-        "--participants",
-        config.contacts.map((contact) => contact.handle).join(",")
-      ];
+      return ["watch", "--json", "--attachments"];
     },
 
     handleIncomingMessage(
@@ -76,7 +102,20 @@ export function createBridgeService(config: BridgeConfig) {
       }
 
       seenMessageIds.set(message.messageId, message.receivedAt);
-      const decision = contactPolicy.evaluate(message.handle);
+      const parsedAdminCommand =
+        adminHandles.has(message.handle) && message.text
+          ? parseBridgeAdminCommand(message.text)
+          : null;
+
+      if (parsedAdminCommand) {
+        return {
+          type: "command",
+          handle: message.handle,
+          command: parsedAdminCommand
+        };
+      }
+
+      const decision = createDynamicContactPolicy().evaluate(message.handle);
 
       if (!decision.allowed) {
         return {

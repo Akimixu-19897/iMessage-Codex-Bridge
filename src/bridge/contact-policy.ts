@@ -13,12 +13,11 @@ type RejectedDecision = {
 export type ContactPolicyDecision = AllowedDecision | RejectedDecision;
 
 export function createContactPolicy(config: BridgeConfig) {
-  const contactsByHandle = new Map(
-    config.contacts.map((contact) => [contact.handle, contact] as const)
-  );
-
   return {
     evaluate(handle: string): ContactPolicyDecision {
+      const contactsByHandle = new Map(
+        config.contacts.map((contact) => [contact.handle, contact] as const)
+      );
       const contact = contactsByHandle.get(handle);
 
       if (contact) {

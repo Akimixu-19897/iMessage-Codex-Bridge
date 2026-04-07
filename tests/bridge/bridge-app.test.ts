@@ -21,9 +21,7 @@ describe("createBridgeApp", () => {
     expect(app.watchArgs).toEqual([
       "watch",
       "--json",
-      "--attachments",
-      "--participants",
-      "+8613800000000"
+      "--attachments"
     ]);
   });
 
@@ -74,6 +72,14 @@ describe("createBridgeApp", () => {
       actions.map((action) =>
         action.type === "reject"
           ? action
+          : action.type === "command"
+            ? {
+                type: "reply" as const,
+                handle: action.handle,
+                message: "管理员命令执行完成",
+                threadId: "admin-command",
+                turnId: "admin-command"
+              }
           : {
               type: "reply" as const,
               handle: action.batch.handle,

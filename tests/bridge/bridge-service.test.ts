@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import { createBridgeService } from "../../src/bridge/bridge-service.js";
 
 describe("createBridgeService", () => {
-  test("builds watch arguments from whitelisted contacts", () => {
+  test("builds watch arguments for all inbound messages", () => {
     const service = createBridgeService({
       rejectionMessage: "请联系管理员开通权限。",
       messageMergeWindowMs: 5000,
@@ -21,13 +21,7 @@ describe("createBridgeService", () => {
       ]
     });
 
-    expect(service.buildWatchArgs()).toEqual([
-      "watch",
-      "--json",
-      "--attachments",
-      "--participants",
-      "+8613800000000,+8613900000000"
-    ]);
+    expect(service.buildWatchArgs()).toEqual(["watch", "--json", "--attachments"]);
   });
 
   test("returns rejection action for non-whitelisted contacts", () => {
@@ -207,5 +201,39 @@ describe("createBridgeService", () => {
     });
 
     expect(service.flushReady(7000)).toEqual([]);
+  });
+
+  test("returns admin command actions for configured administrators", () => {
+    const service = createBridgeService({
+      rejectionMessage: "请联系管理员开通权限。",
+      messageMergeWindowMs: 5000,
+      adminHandles: ["+8613700000000"],
+      contacts: [
+        {
+          handle: "+8613800000000",
+          name: "联系人 A",
+          workspace: "/tmp/workspace-a"
+        }
+      ]
+    });
+
+    expect(
+      service.handleIncomingMessage({
+        messageId: "m-admin",
+        chatId: "chat-1",
+        handle: "+8613700000000",
+        senderName: "管理员",
+        text: "/bridge list",
+        receivedAt: 1000,
+        attachmentPaths: [],
+        isFromMe: false
+      })
+    ).toEqual({
+      type: "command",
+      handle: "+8613700000000",
+      command: {
+        type: "list"
+      }
+    });
   });
 });

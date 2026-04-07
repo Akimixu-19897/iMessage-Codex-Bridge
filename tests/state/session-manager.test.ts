@@ -80,4 +80,46 @@ describe("createSessionManager", () => {
       "未找到联系人会话映射: +8613700000000"
     );
   });
+
+  test("upserts and removes contact sessions in place", () => {
+    const state = createInitialBridgeState(TEST_CONFIG);
+    const manager = createSessionManager(state);
+
+    expect(
+      manager.upsertContact({
+        handle: "+8613700000000",
+        name: "联系人 C",
+        workspace: "/tmp/workspace-c"
+      })
+    ).toEqual({
+      handle: "+8613700000000",
+      name: "联系人 C",
+      workspace: "/tmp/workspace-c",
+      threadId: null,
+      lastActiveAt: null
+    });
+
+    expect(
+      manager.upsertContact({
+        handle: "+8613900000000",
+        name: "联系人 B2",
+        workspace: "/tmp/workspace-b2"
+      })
+    ).toEqual({
+      handle: "+8613900000000",
+      name: "联系人 B2",
+      workspace: "/tmp/workspace-b2",
+      threadId: null,
+      lastActiveAt: null
+    });
+
+    expect(manager.removeContact("+8613700000000")).toMatchObject({
+      handle: "+8613700000000",
+      name: "联系人 C"
+    });
+    expect(state.contacts.map((contact) => contact.handle)).toEqual([
+      "+8613800000000",
+      "+8613900000000"
+    ]);
+  });
 });

@@ -10,6 +10,7 @@ import { createInitialBridgeState } from "../../src/state/state-store.js";
 const TEST_CONFIG = {
   rejectionMessage: "请联系管理员开通权限。",
   messageMergeWindowMs: 5000,
+  adminHandles: ["+8613800000000"],
   contacts: [
     {
       handle: "+8613800000000",
@@ -20,6 +21,108 @@ const TEST_CONFIG = {
 };
 
 describe("createLocalBridgeRuntime", () => {
+  test("executes admin commands and immediately replies with state changes", async () => {
+    const state = createInitialBridgeState({
+      ...TEST_CONFIG,
+      adminHandles: ["+8613700000000"]
+    });
+    const stateDirectory = await mkdtemp(join(tmpdir(), "bridge-runtime-"));
+    const sendTextMessage = vi.fn(async () => ({
+      exitCode: 0,
+      stdout: '{"ok":true}',
+      stderr: ""
+    }));
+    const request = vi.fn(async (method: string) => {
+      if (method === "thread/start") {
+        return {
+          thread: {
+            id: "thread-2",
+            cwd: "/tmp/workspace-b"
+          }
+        };
+      }
+
+      if (method === "turn/start") {
+        queueMicrotask(() => {
+          runtime.handleCodexNotification({
+            method: "item/agentMessage/delta",
+            params: {
+              threadId: "thread-2",
+              turnId: "turn-2",
+              itemId: "item-2",
+              delta: "新联系人已接入"
+            }
+          });
+          runtime.handleCodexNotification({
+            method: "turn/completed",
+            params: {
+              threadId: "thread-2",
+              turn: {
+                id: "turn-2",
+                status: "completed"
+              }
+            }
+          });
+        });
+
+        return {
+          turn: {
+            id: "turn-2",
+            status: "inProgress"
+          }
+        };
+      }
+
+      throw new Error(`unexpected method: ${method}`);
+    });
+    const runtime = createLocalBridgeRuntime({
+      config: {
+        ...TEST_CONFIG,
+        adminHandles: ["+8613700000000"]
+      },
+      state,
+      statePath: join(stateDirectory, "bridge-state.json"),
+      appServerSession: {
+        request
+      },
+      sendTextMessage
+    });
+
+    runtime.app.processImsgChunk(
+      '{"id":"admin-1","chatId":"chat-1","sender":{"handle":"+8613700000000"},"text":"/bridge allow +8613900000000 联系人B /tmp/workspace-b","timestamp":1000,"attachments":[]}\n'
+    );
+
+    await expect(runtime.app.dispatchReadyActions(1000)).resolves.toEqual([
+      {
+        handle: "+8613700000000",
+        message: "已保存联系人：+8613900000000 | 联系人B | /tmp/workspace-b",
+        exitCode: 0
+      }
+    ]);
+
+    runtime.app.processImsgChunk(
+      '{"id":"m1","chatId":"chat-2","sender":{"handle":"+8613900000000"},"text":"你好","timestamp":2000,"attachments":[]}\n'
+    );
+
+    await expect(runtime.app.dispatchReadyActions(8000)).resolves.toEqual([
+      {
+        handle: "+8613900000000",
+        message: "新联系人已接入",
+        exitCode: 0
+      }
+    ]);
+
+    expect(state.contacts.map((contact) => contact.handle)).toEqual([
+      "+8613800000000",
+      "+8613900000000"
+    ]);
+    expect(request).toHaveBeenNthCalledWith(1, "thread/start", {
+      cwd: "/tmp/workspace-b",
+      experimentalRawEvents: false,
+      persistExtendedHistory: true
+    });
+  });
+
   test("assembles bridge -> codex -> outbound delivery into one runtime", async () => {
     const state = createInitialBridgeState(TEST_CONFIG);
     const stateDirectory = await mkdtemp(join(tmpdir(), "bridge-runtime-"));

@@ -31,7 +31,7 @@ describe("runMain", () => {
     const error = vi.fn();
     const startBridge = vi.fn(async () => ({
       close: vi.fn(),
-      watchArgs: ["watch", "--json", "--participants", "+8613800000000"]
+      watchArgs: ["watch", "--json", "--attachments"]
     }));
 
     const exitCode = await runMain({
@@ -79,7 +79,7 @@ describe("runMain", () => {
       contactCount: 1,
       statePath: expect.stringContaining("data/bridge-state.json"),
       attachmentDirectory: expect.stringContaining("data/attachments"),
-      watchArgs: ["watch", "--json", "--participants", "+8613800000000"]
+      watchArgs: ["watch", "--json", "--attachments"]
     });
     expect(error).not.toHaveBeenCalled();
   });
@@ -88,13 +88,7 @@ describe("runMain", () => {
     const log = vi.fn();
     const startBridge = vi.fn(async () => ({
       close: vi.fn(),
-      watchArgs: [
-        "watch",
-        "--json",
-        "--attachments",
-        "--participants",
-        "+8613800000000,+8613900000000"
-      ]
+      watchArgs: ["watch", "--json", "--attachments"]
     }));
 
     const exitCode = await runMain({
@@ -131,13 +125,7 @@ describe("runMain", () => {
       contactCount: 2,
       statePath: expect.stringContaining("data/bridge-state.json"),
       attachmentDirectory: expect.stringContaining("data/attachments"),
-      watchArgs: [
-        "watch",
-        "--json",
-        "--attachments",
-        "--participants",
-        "+8613800000000,+8613900000000"
-      ]
+      watchArgs: ["watch", "--json", "--attachments"]
     });
   });
 });

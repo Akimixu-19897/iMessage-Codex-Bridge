@@ -2,6 +2,7 @@ import type { BridgeRuntimeAction } from "./bridge-runtime.js";
 
 type RejectAction = Extract<BridgeRuntimeAction, { type: "reject" }>;
 type SubmitAction = Extract<BridgeRuntimeAction, { type: "submit" }>;
+type CommandAction = Extract<BridgeRuntimeAction, { type: "command" }>;
 
 export type BridgeReplyAction = {
   type: "reply";
@@ -33,6 +34,10 @@ type CreateBridgeCodexExecutorOptions = {
     text: string;
     status: string;
   }>;
+  executeAdminCommand?: (params: {
+    handle: string;
+    command: CommandAction["command"];
+  }) => Promise<string>;
   codexUnavailableMessage?: string;
 };
 
@@ -51,12 +56,47 @@ export function createBridgeCodexExecutor(
           continue;
         }
 
+        if (action.type === "command") {
+          results.push(await executeCommandAction(action, options));
+          continue;
+        }
+
         results.push(await executeSubmitAction(action, options));
       }
 
       return results;
     }
   };
+}
+
+async function executeCommandAction(
+  action: CommandAction,
+  options: CreateBridgeCodexExecutorOptions
+): Promise<BridgeReplyAction> {
+  try {
+    const message = await (options.executeAdminCommand
+      ? options.executeAdminCommand({
+          handle: action.handle,
+          command: action.command
+        })
+      : Promise.resolve("管理员命令未配置。"));
+
+    return {
+      type: "reply",
+      handle: action.handle,
+      message,
+      threadId: "admin-command",
+      turnId: "admin-command"
+    };
+  } catch {
+    return {
+      type: "reply",
+      handle: action.handle,
+      message: "管理员命令执行失败，请稍后重试。",
+      threadId: "admin-command",
+      turnId: "admin-command"
+    };
+  }
 }
 
 async function executeSubmitAction(

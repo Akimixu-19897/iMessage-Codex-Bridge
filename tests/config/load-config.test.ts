@@ -15,6 +15,8 @@ describe("loadConfig", () => {
       [
         "rejectionMessage: 请联系管理员开通权限。",
         "messageMergeWindowMs: 4000",
+        "adminHandles:",
+        "  - '+8613700000000'",
         "contacts:",
         "  - handle: '+8613800000000'",
         "    name: 测试联系人",
@@ -27,6 +29,7 @@ describe("loadConfig", () => {
 
     expect(config.rejectionMessage).toBe("请联系管理员开通权限。");
     expect(config.messageMergeWindowMs).toBe(4000);
+    expect(config.adminHandles).toEqual(["+8613700000000"]);
     expect(config.contacts).toEqual([
       {
         handle: "+8613800000000",

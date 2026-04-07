@@ -9,6 +9,7 @@ import type { BridgeConfig } from "../config/schema.js";
 import { createSessionManager } from "../state/session-manager.js";
 import type { BridgeState } from "../state/state-store.js";
 import { saveBridgeState } from "../state/state-store.js";
+import { createAdminCommandExecutor } from "./admin-command-executor.js";
 import { createBridgeApp } from "./bridge-app.js";
 import { createBridgeCodexExecutor } from "./bridge-codex-executor.js";
 import { createBridgeOutboundDispatcher } from "./bridge-outbound-dispatcher.js";
@@ -48,6 +49,10 @@ export function createLocalBridgeRuntime(
       path: options.statePath,
       state: options.state
     });
+  const adminCommandExecutor = createAdminCommandExecutor({
+    sessionManager,
+    saveState
+  });
   const appServerClient = createCodexAppServerClient({
     invokeRequest: (request) =>
       options.appServerSession.request(
@@ -65,6 +70,7 @@ export function createLocalBridgeRuntime(
     threadService
   });
   const bridgeCodexExecutor = createBridgeCodexExecutor({
+    executeAdminCommand: ({ command }) => adminCommandExecutor.execute(command),
     submitTextTurn: async ({ handle, text, imagePaths, messageIds }) => {
       let stagedAttachments: Awaited<ReturnType<typeof stageAttachments>> = [];
 
@@ -119,6 +125,8 @@ export function createLocalBridgeRuntime(
     logError
   });
   const app = createBridgeApp(options.config, {
+    contactsProvider: () => options.state.contacts,
+    adminHandles: options.config.adminHandles,
     executeRuntimeActions: (actions) => bridgeCodexExecutor.execute(actions),
     dispatchExecutionActions: (actions) => bridgeOutboundDispatcher.dispatch(actions)
   });

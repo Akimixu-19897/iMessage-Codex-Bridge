@@ -20,6 +20,7 @@ describe("createBridgeRuntime", () => {
       '{"id":"m1","chatId":"chat-1","sender":{"handle":"+8613900000000","displayName":"陌生人"},"text":"你好","timestamp":1000,"attachments":[]}\n'
     );
 
+    expect(runtime.watchArgs).toEqual(["watch", "--json", "--attachments"]);
     expect(runtime.drainActions(1000)).toEqual([
       {
         type: "reject",
@@ -92,6 +93,35 @@ describe("createBridgeRuntime", () => {
           text: "第一句",
           attachments: [],
           lastReceivedAt: 1000
+        }
+      }
+    ]);
+  });
+
+  test("emits admin command actions before whitelist checks", () => {
+    const runtime = createBridgeRuntime({
+      rejectionMessage: "请联系管理员开通权限。",
+      messageMergeWindowMs: 5000,
+      contacts: [
+        {
+          handle: "+8613800000000",
+          name: "联系人 A",
+          workspace: "/tmp/workspace-a"
+        }
+      ],
+      adminHandles: ["+8613700000000"]
+    });
+
+    runtime.pushImsgChunk(
+      '{"id":"m1","chatId":"chat-1","sender":{"handle":"+8613700000000","displayName":"管理员"},"text":"/bridge list","timestamp":1000,"attachments":[]}\n'
+    );
+
+    expect(runtime.drainActions(1000)).toEqual([
+      {
+        type: "command",
+        handle: "+8613700000000",
+        command: {
+          type: "list"
         }
       }
     ]);
