@@ -18,6 +18,15 @@ type InternalBatch = FlushedMessageBatch;
 
 export function createMessageBuffer(messageMergeWindowMs: number) {
   const batches = new Map<string, InternalBatch>();
+  function cloneBatch(batch: InternalBatch): FlushedMessageBatch {
+    return {
+      handle: batch.handle,
+      messageIds: [...batch.messageIds],
+      text: batch.text,
+      attachments: [...batch.attachments],
+      lastReceivedAt: batch.lastReceivedAt
+    };
+  }
 
   return {
     enqueue(message: BufferedInboundMessage): void {
@@ -48,17 +57,22 @@ export function createMessageBuffer(messageMergeWindowMs: number) {
           continue;
         }
 
-        ready.push({
-          handle: batch.handle,
-          messageIds: [...batch.messageIds],
-          text: batch.text,
-          attachments: [...batch.attachments],
-          lastReceivedAt: batch.lastReceivedAt
-        });
+        ready.push(cloneBatch(batch));
         batches.delete(handle);
       }
 
       return ready.sort((left, right) => left.lastReceivedAt - right.lastReceivedAt);
+    },
+
+    flushHandle(handle: string): FlushedMessageBatch[] {
+      const batch = batches.get(handle);
+
+      if (!batch) {
+        return [];
+      }
+
+      batches.delete(handle);
+      return [cloneBatch(batch)];
     }
   };
 }

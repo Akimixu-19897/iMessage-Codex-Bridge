@@ -13,18 +13,25 @@ export type ThreadStartParams = {
   cwd: string;
   experimentalRawEvents?: boolean;
   persistExtendedHistory?: boolean;
+  approvalPolicy?: "untrusted" | "on-failure" | "on-request" | "never";
+  sandbox?: "read-only" | "workspace-write" | "danger-full-access";
+  developerInstructions?: string;
 };
 
 export type ThreadResumeParams = {
   threadId: string;
   cwd?: string;
   persistExtendedHistory?: boolean;
+  approvalPolicy?: "untrusted" | "on-failure" | "on-request" | "never";
+  sandbox?: "read-only" | "workspace-write" | "danger-full-access";
+  developerInstructions?: string;
 };
 
 export type CodexAppServerClient = {
   startThread(params: ThreadStartParams): Promise<CodexThread>;
   resumeThread(params: ThreadResumeParams): Promise<CodexThread>;
   startTurn(params: TurnStartParams): Promise<CodexTurn>;
+  interruptTurn(params: { threadId: string; turnId: string }): Promise<void>;
 };
 
 export type TurnInputItem = {
@@ -50,6 +57,9 @@ export type AppServerRequest =
         cwd: string;
         experimentalRawEvents: boolean;
         persistExtendedHistory: boolean;
+        approvalPolicy?: "untrusted" | "on-failure" | "on-request" | "never";
+        sandbox?: "read-only" | "workspace-write" | "danger-full-access";
+        developerInstructions?: string;
       };
     }
   | {
@@ -59,6 +69,9 @@ export type AppServerRequest =
         threadId: string;
         cwd?: string;
         persistExtendedHistory: boolean;
+        approvalPolicy?: "untrusted" | "on-failure" | "on-request" | "never";
+        sandbox?: "read-only" | "workspace-write" | "danger-full-access";
+        developerInstructions?: string;
       };
     }
   | {
@@ -79,6 +92,14 @@ export type AppServerRequest =
         )[];
         cwd?: string;
       };
+    }
+  | {
+      id: number;
+      method: "turn/interrupt";
+      params: {
+        threadId: string;
+        turnId: string;
+      };
     };
 
 type AppServerThreadEnvelope = {
@@ -91,7 +112,7 @@ type AppServerTurnEnvelope = {
 
 export type AppServerRequestInvoker = (
   request: AppServerRequest
-) => Promise<AppServerThreadEnvelope | AppServerTurnEnvelope>;
+) => Promise<unknown>;
 
 type CreateCodexAppServerClientOptions = {
   invokeRequest: AppServerRequestInvoker;
@@ -111,7 +132,10 @@ export function createCodexAppServerClient(
         params: {
           cwd: params.cwd,
           experimentalRawEvents: params.experimentalRawEvents ?? false,
-          persistExtendedHistory: params.persistExtendedHistory ?? true
+          persistExtendedHistory: params.persistExtendedHistory ?? true,
+          approvalPolicy: params.approvalPolicy,
+          sandbox: params.sandbox,
+          developerInstructions: params.developerInstructions
         }
       });
 
@@ -125,7 +149,10 @@ export function createCodexAppServerClient(
         params: {
           threadId: params.threadId,
           cwd: params.cwd,
-          persistExtendedHistory: params.persistExtendedHistory ?? true
+          persistExtendedHistory: params.persistExtendedHistory ?? true,
+          approvalPolicy: params.approvalPolicy,
+          sandbox: params.sandbox,
+          developerInstructions: params.developerInstructions
         }
       });
 
@@ -155,6 +182,20 @@ export function createCodexAppServerClient(
       });
 
       return expectTurnEnvelope(response).turn;
+    },
+
+    async interruptTurn(params: {
+      threadId: string;
+      turnId: string;
+    }): Promise<void> {
+      await options.invokeRequest({
+        id: nextRequestId(),
+        method: "turn/interrupt",
+        params: {
+          threadId: params.threadId,
+          turnId: params.turnId
+        }
+      } as AppServerRequest);
     }
   };
 }
@@ -167,21 +208,21 @@ function defaultNextRequestId(): number {
 }
 
 function expectThreadEnvelope(
-  response: AppServerThreadEnvelope | AppServerTurnEnvelope
+  response: unknown
 ): AppServerThreadEnvelope {
-  if (!("thread" in response)) {
+  if (!response || typeof response !== "object" || !("thread" in response)) {
     throw new Error("app-server 返回了意外的响应类型，期望 thread");
   }
 
-  return response;
+  return response as AppServerThreadEnvelope;
 }
 
 function expectTurnEnvelope(
-  response: AppServerThreadEnvelope | AppServerTurnEnvelope
+  response: unknown
 ): AppServerTurnEnvelope {
-  if (!("turn" in response)) {
+  if (!response || typeof response !== "object" || !("turn" in response)) {
     throw new Error("app-server 返回了意外的响应类型，期望 turn");
   }
 
-  return response;
+  return response as AppServerTurnEnvelope;
 }

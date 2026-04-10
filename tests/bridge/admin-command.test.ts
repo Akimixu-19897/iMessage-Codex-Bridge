@@ -20,6 +20,9 @@ describe("parseBridgeAdminCommand", () => {
     expect(parseBridgeAdminCommand("/bridge list")).toEqual({
       type: "list"
     });
+    expect(parseBridgeAdminCommand("/bridge workspace")).toEqual({
+      type: "workspace_default"
+    });
     expect(
       parseBridgeAdminCommand('/bridge workspace +8613900000000 "/tmp/new workspace"')
     ).toEqual({
@@ -43,8 +46,17 @@ describe("parseBridgeAdminCommand", () => {
     });
     expect(parseBridgeAdminCommand("/bridge allow only-two-args")).toEqual({
       type: "invalid",
-      message: "allow 命令格式：/bridge allow <handle> <name> <workspace>"
+      message: "allow 命令格式：/bridge allow <handle> <name> [workspace]"
     });
     expect(parseBridgeAdminCommand("普通消息")).toBeNull();
+  });
+
+  test("parses allow commands without explicit workspace", () => {
+    expect(parseBridgeAdminCommand("/bridge allow Qiushi.Xu@ks.casetekcorp.com lux-80531901")).toEqual({
+      type: "allow",
+      handle: "Qiushi.Xu@ks.casetekcorp.com",
+      name: "lux-80531901",
+      workspace: undefined
+    });
   });
 });

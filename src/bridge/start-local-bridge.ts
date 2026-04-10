@@ -7,6 +7,7 @@ import {
   type BridgeState
 } from "../state/state-store.js";
 import { createBridgeLoopRunner } from "./bridge-loop-runner.js";
+import { ensureContactWorkspace } from "./contact-workspace.js";
 import { createLocalBridgeRuntime } from "./local-bridge-runtime.js";
 
 type AppServerSession = {
@@ -37,6 +38,7 @@ type StartLocalBridgeOptions = {
   executablePath: string;
   statePath: string;
   attachmentDirectory?: string;
+  ensureWorkspaceDirectory?: (path: string) => Promise<void>;
   loadBridgeState?: (options: {
     path: string;
     config: BridgeConfig;
@@ -80,8 +82,19 @@ export async function startLocalBridge(options: StartLocalBridgeOptions) {
     path: options.statePath,
     config: options.config
   });
+  const ensureWorkspaceDirectory =
+    options.ensureWorkspaceDirectory ?? ensureContactWorkspace;
 
-  let localRuntime: LocalBridgeRuntime;
+  const workspacePaths = new Set(
+    [...options.config.contacts, ...state.contacts].map((contact) => contact.workspace)
+  );
+
+  for (const workspacePath of workspacePaths) {
+    await ensureWorkspaceDirectory(workspacePath);
+  }
+
+  let localRuntime: LocalBridgeRuntime | null = null;
+  const pendingNotifications: Array<{ method: string; params?: unknown }> = [];
   const appServerHostFactory =
     options.createAppServerHost ??
     ((hostOptions) =>
@@ -90,6 +103,11 @@ export async function startLocalBridge(options: StartLocalBridgeOptions) {
       }));
   const appServerSession = appServerHostFactory({
     onNotification: (notification) => {
+      if (!localRuntime) {
+        pendingNotifications.push(notification);
+        return;
+      }
+
       localRuntime.handleCodexNotification(notification);
     }
   }).start();
@@ -106,6 +124,9 @@ export async function startLocalBridge(options: StartLocalBridgeOptions) {
     appServerSession,
     sendTextMessage
   });
+  for (const notification of pendingNotifications) {
+    localRuntime.handleCodexNotification(notification);
+  }
 
   const createWatchHost = options.createImsgWatchHost ?? createImsgWatchHost;
   const watchHost = createWatchHost({

@@ -16,11 +16,13 @@ describe("startLocalBridge", () => {
       ]
     };
     const state = {
-      version: 1 as const,
+      version: 3 as const,
       contacts: [],
       processedMessages: [],
       outboundMessages: [],
-      attachments: []
+      attachments: [],
+      nextJobSequence: 1,
+      jobs: []
     };
     const appServerSession = {
       request: vi.fn(async () => ({})),
@@ -53,6 +55,7 @@ describe("startLocalBridge", () => {
     const createBridgeLoopRunner = vi.fn(() => ({
       start: vi.fn(() => loopSession)
     }));
+    const ensureWorkspaceDirectory = vi.fn(async () => {});
 
     const runtime = await startLocalBridge({
       config,
@@ -64,6 +67,7 @@ describe("startLocalBridge", () => {
       createLocalRuntime,
       createImsgWatchHost,
       createBridgeLoopRunner,
+      ensureWorkspaceDirectory,
       sendTextMessage: vi.fn(async () => ({ exitCode: 0, stdout: "", stderr: "" }))
     });
 
@@ -72,6 +76,7 @@ describe("startLocalBridge", () => {
       config
     });
     expect(createAppServerHost).toHaveBeenCalledTimes(1);
+    expect(ensureWorkspaceDirectory).toHaveBeenCalledWith("/tmp/workspace-a");
     expect(createLocalRuntime).toHaveBeenCalledWith({
       config,
       state,
@@ -92,6 +97,87 @@ describe("startLocalBridge", () => {
     runtime.close();
     expect(loopSession.close).toHaveBeenCalledTimes(1);
     expect(appServerSession.close).toHaveBeenCalledTimes(1);
+  });
+
+  test("ensures workspace directories for both config and restored state contacts", async () => {
+    const ensureWorkspaceDirectory = vi.fn(async () => {});
+
+    await startLocalBridge({
+      config: {
+        rejectionMessage: "请联系管理员开通权限。",
+        messageMergeWindowMs: 5000,
+        contacts: [
+          {
+            handle: "+8613800000000",
+            name: "联系人 A",
+            workspace: "/tmp/workspace-a"
+          }
+        ]
+      },
+      executablePath: "/opt/homebrew/bin/imsg",
+      statePath: "/tmp/bridge-state.json",
+      loadBridgeState: async () => ({
+        version: 3,
+        contacts: [
+          {
+            handle: "+8613800000000",
+            name: "联系人 A",
+            workspace: "/tmp/workspace-a",
+            currentSessionId: null,
+            sessions: []
+          },
+          {
+            handle: "Qiushi.Xu@ks.casetekcorp.com",
+            name: "lux-80531901",
+            workspace: "/tmp/workspace-mail",
+            currentSessionId: null,
+            sessions: []
+          }
+        ],
+        processedMessages: [],
+        outboundMessages: [],
+        attachments: [],
+        nextJobSequence: 1,
+        jobs: []
+      }),
+      createAppServerHost: vi.fn(() => ({
+        start: vi.fn(() => ({
+          request: vi.fn(async () => ({})),
+          close: vi.fn()
+        }))
+      })),
+      createLocalRuntime: vi.fn(() => ({
+        app: {
+          watchArgs: ["watch", "--json"],
+          processImsgChunk: vi.fn(),
+          drainActions: vi.fn(() => []),
+          executeReadyActions: vi.fn(async () => []),
+          dispatchReadyActions: vi.fn(async () => [])
+        },
+        handleCodexNotification: vi.fn()
+      })),
+      createImsgWatchHost: vi.fn(() => ({
+        start: vi.fn(() => ({
+          close: vi.fn()
+        }))
+      })),
+      createBridgeLoopRunner: vi.fn(() => ({
+        start: vi.fn(() => ({
+          close: vi.fn()
+        }))
+      })),
+      ensureWorkspaceDirectory,
+      sendTextMessage: vi.fn(async () => ({
+        exitCode: 0,
+        stdout: "",
+        stderr: ""
+      }))
+    });
+
+    expect(ensureWorkspaceDirectory.mock.calls).toEqual([
+      ["/tmp/workspace-a"],
+      ["/tmp/workspace-mail"]
+    ]);
   });
 
   test("forwards app-server notifications into the local runtime collector", async () => {
@@ -129,11 +215,13 @@ describe("startLocalBridge", () => {
       executablePath: "/opt/homebrew/bin/imsg",
       statePath: "/tmp/bridge-state.json",
       loadBridgeState: async () => ({
-        version: 1,
+        version: 3,
         contacts: [],
         processedMessages: [],
         outboundMessages: [],
-        attachments: []
+        attachments: [],
+        nextJobSequence: 1,
+        jobs: []
       }),
       createAppServerHost: vi.fn((options) => {
         onNotification = options.onNotification;
@@ -172,5 +260,93 @@ describe("startLocalBridge", () => {
         threadId: "thread-1"
       }
     });
+  });
+
+  test("buffers app-server notifications that arrive before runtime initialization finishes", async () => {
+    const seenNotifications: Array<{ method: string; params?: unknown }> = [];
+    const createLocalRuntime = vi.fn(() => ({
+      app: {
+        watchArgs: ["watch", "--json"],
+        processImsgChunk: vi.fn(),
+        drainActions: vi.fn(() => []),
+        executeReadyActions: vi.fn(async () => []),
+        dispatchReadyActions: vi.fn(async () => [])
+      },
+      handleCodexNotification: vi.fn((notification) => {
+        seenNotifications.push(notification);
+      })
+    }));
+
+    await expect(
+      startLocalBridge({
+        config: {
+          rejectionMessage: "请联系管理员开通权限。",
+          messageMergeWindowMs: 5000,
+          contacts: []
+        },
+        executablePath: "/opt/homebrew/bin/imsg",
+        statePath: "/tmp/bridge-state.json",
+        loadBridgeState: async () => ({
+          version: 3,
+          contacts: [],
+          processedMessages: [],
+          outboundMessages: [],
+          attachments: [],
+          nextJobSequence: 1,
+          jobs: []
+        }),
+        createAppServerHost: vi.fn(({ onNotification }) => ({
+          start: vi.fn(() => {
+            onNotification({
+              method: "turn/completed",
+              params: {
+                threadId: "thread-early",
+                turn: {
+                  id: "turn-early",
+                  status: "completed"
+                }
+              }
+            });
+
+            return {
+              request: vi.fn(async () => ({})),
+              close: vi.fn()
+            };
+          })
+        })),
+        createLocalRuntime,
+        createImsgWatchHost: vi.fn(() => ({
+          start: vi.fn(() => ({
+            close: vi.fn()
+          }))
+        })),
+        createBridgeLoopRunner: vi.fn(() => ({
+          start: vi.fn(() => ({
+            close: vi.fn()
+          }))
+        })),
+        sendTextMessage: vi.fn(async () => ({
+          exitCode: 0,
+          stdout: "",
+          stderr: ""
+        }))
+      })
+    ).resolves.toMatchObject({
+      watchArgs: ["watch", "--json"]
+    });
+
+    expect(createLocalRuntime).toHaveBeenCalledTimes(1);
+    expect(seenNotifications).toEqual([
+      {
+        method: "turn/completed",
+        params: {
+          threadId: "thread-early",
+          turn: {
+            id: "turn-early",
+            status: "completed"
+          }
+        }
+      }
+    ]);
   });
 });

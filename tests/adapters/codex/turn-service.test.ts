@@ -6,6 +6,7 @@ describe("createTurnService", () => {
   test("ensures the contact thread before starting a text turn", async () => {
     const ensureThread = vi.fn(async () => ({
       handle: "+8613800000000",
+      sessionId: "session-1",
       workspace: "/tmp/workspace-a",
       threadId: "thread-1",
       created: false,
@@ -22,7 +23,8 @@ describe("createTurnService", () => {
       appServerClient: {
         startThread: vi.fn(),
         resumeThread: vi.fn(),
-        startTurn
+        startTurn,
+        interruptTurn: vi.fn()
       },
       threadService: {
         ensureThread
@@ -36,6 +38,7 @@ describe("createTurnService", () => {
       })
     ).resolves.toEqual({
       handle: "+8613800000000",
+      sessionId: "session-1",
       threadId: "thread-1",
       workspace: "/tmp/workspace-a",
       turn: {
@@ -62,7 +65,8 @@ describe("createTurnService", () => {
       appServerClient: {
         startThread: vi.fn(),
         resumeThread: vi.fn(),
-        startTurn: vi.fn()
+        startTurn: vi.fn(),
+        interruptTurn: vi.fn()
       },
       threadService: {
         ensureThread: vi.fn(async () => {
@@ -88,11 +92,13 @@ describe("createTurnService", () => {
       appServerClient: {
         startThread: vi.fn(),
         resumeThread: vi.fn(),
-        startTurn
+        startTurn,
+        interruptTurn: vi.fn()
       },
       threadService: {
         ensureThread: vi.fn(async () => ({
           handle: "+8613800000000",
+          sessionId: "session-1",
           workspace: "/tmp/workspace-a",
           threadId: "thread-1",
           created: false,

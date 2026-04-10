@@ -91,4 +91,29 @@ describe("normalizeImsgMessage", () => {
       isFromMe: true
     });
   });
+
+  test("normalizes real imsg watch events where sender is a plain string", () => {
+    const normalized = normalizeImsgMessage({
+      id: 8 as any,
+      guid: "FAAC4CED-1610-4F76-960C-7BD8A2CC90AE",
+      chat_id: 1,
+      sender: "+8618352869601" as any,
+      destination_caller_id: "1527829777@qq.com" as any,
+      text: "111",
+      created_at: "2026-04-07T11:10:23.321Z",
+      is_from_me: false,
+      attachments: []
+    } as any);
+
+    expect(normalized).toEqual({
+      messageId: "8",
+      chatId: "1",
+      handle: "+8618352869601",
+      senderName: null,
+      text: "111",
+      receivedAt: Date.parse("2026-04-07T11:10:23.321Z"),
+      attachmentPaths: [],
+      isFromMe: false
+    });
+  });
 });

@@ -6,15 +6,17 @@ export type ImsgRawAttachment = {
 };
 
 export type ImsgRawMessage = {
-  id?: string;
+  id?: string | number;
   guid?: string;
   chatId?: string;
   chat_id?: string | number;
-  sender: {
-    handle: string;
-    displayName?: string | null;
-    display_name?: string | null;
-  };
+  sender:
+    | string
+    | {
+        handle: string;
+        displayName?: string | null;
+        display_name?: string | null;
+      };
   text: string;
   timestamp?: number;
   created_at?: string | number | null;
@@ -39,15 +41,21 @@ export function normalizeImsgMessage(
 ): NormalizedInboundMessage {
   const messageId = rawMessage.id ?? rawMessage.guid;
   const chatId = rawMessage.chatId ?? String(rawMessage.chat_id ?? "");
+  const handle =
+    typeof rawMessage.sender === "string"
+      ? rawMessage.sender
+      : rawMessage.sender.handle;
   const senderName =
-    rawMessage.sender.displayName ?? rawMessage.sender.display_name ?? null;
+    typeof rawMessage.sender === "string"
+      ? null
+      : rawMessage.sender.displayName ?? rawMessage.sender.display_name ?? null;
   const receivedAt =
     rawMessage.timestamp ?? normalizeCreatedAt(rawMessage.created_at);
 
   return {
     messageId: normalizeRequiredString(messageId),
     chatId: normalizeRequiredString(chatId),
-    handle: rawMessage.sender.handle,
+    handle: normalizeRequiredString(handle),
     senderName,
     text: rawMessage.text,
     receivedAt,
@@ -70,6 +78,10 @@ function normalizeCreatedAt(value: ImsgRawMessage["created_at"]): number {
   return 0;
 }
 
-function normalizeRequiredString(value: string | undefined): string {
-  return value ?? "";
+function normalizeRequiredString(value: string | number | undefined): string {
+  if (value === undefined) {
+    return "";
+  }
+
+  return String(value);
 }

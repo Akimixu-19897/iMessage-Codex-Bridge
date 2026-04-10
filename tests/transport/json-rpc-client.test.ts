@@ -113,4 +113,46 @@ describe("createJsonRpcClient", () => {
       }
     });
   });
+
+  test("cleans pending request when sendMessage fails", async () => {
+    const unhandledRejections: unknown[] = [];
+    const onUnhandledRejection = (reason: unknown) => {
+      unhandledRejections.push(reason);
+    };
+
+    process.on("unhandledRejection", onUnhandledRejection);
+
+    try {
+      const client = createJsonRpcClient({
+        sendMessage: async () => {
+          throw new Error("broken pipe");
+        },
+        nextRequestId: () => 4
+      });
+
+      await expect(
+        client.request("thread/start", {
+          cwd: "/tmp/workspace-c"
+        })
+      ).rejects.toThrow("broken pipe");
+
+      client.handleMessage(
+        JSON.stringify({
+          id: 4,
+          error: {
+            code: -32001,
+            message: "late response"
+          }
+        })
+      );
+
+      await new Promise<void>((resolve) => {
+        setImmediate(resolve);
+      });
+
+      expect(unhandledRejections).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", onUnhandledRejection);
+    }
+  });
 });

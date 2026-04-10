@@ -13,6 +13,7 @@ type CreateTurnServiceOptions = {
 
 export type SubmittedCodexTurn = {
   handle: string;
+  sessionId: string;
   threadId: string;
   workspace: string;
   turn: CodexTurn;
@@ -43,6 +44,7 @@ export function createTurnService(options: CreateTurnServiceOptions) {
 
       return {
         handle: params.handle,
+        sessionId: resolvedThread.sessionId,
         threadId: resolvedThread.threadId,
         workspace: resolvedThread.workspace,
         turn

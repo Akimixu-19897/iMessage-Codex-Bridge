@@ -60,8 +60,25 @@ export function createAppServerStdioHost(
         transport.pushStdoutChunk(chunk.toString());
       });
 
+      const initialized = transport
+        .request("initialize", {
+          clientInfo: {
+            name: "imessage-codex-bridge",
+            title: "iMessage Codex Bridge",
+            version: "0.1.0"
+          },
+          capabilities: {
+            experimentalApi: true,
+            optOutNotificationMethods: []
+          }
+        })
+        .then(async () => {
+          await transport.notify("initialized");
+        });
+
       return {
-        request(method: string, params?: unknown): Promise<unknown> {
+        async request(method: string, params?: unknown): Promise<unknown> {
+          await initialized;
           return transport.request(method, params);
         },
 

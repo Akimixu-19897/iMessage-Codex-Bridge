@@ -7,6 +7,24 @@ import { describe, expect, test, vi } from "vitest";
 import { createLocalBridgeRuntime } from "../../src/bridge/local-bridge-runtime.js";
 import { createInitialBridgeState } from "../../src/state/state-store.js";
 
+async function flushBackgroundJob(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+async function waitFor(predicate: () => boolean): Promise<void> {
+  for (let index = 0; index < 50; index += 1) {
+    if (predicate()) {
+      return;
+    }
+
+    await flushBackgroundJob();
+  }
+
+  throw new Error("condition not met in time");
+}
+
 const TEST_CONFIG = {
   rejectionMessage: "请联系管理员开通权限。",
   messageMergeWindowMs: 5000,
@@ -89,13 +107,13 @@ describe("createLocalBridgeRuntime", () => {
     });
 
     runtime.app.processImsgChunk(
-      '{"id":"admin-1","chatId":"chat-1","sender":{"handle":"+8613700000000"},"text":"/bridge allow +8613900000000 联系人B /tmp/workspace-b","timestamp":1000,"attachments":[]}\n'
+      '{"id":"admin-1","chatId":"chat-1","sender":{"handle":"+8613700000000"},"text":"/bridge allow +8613900000000 联系人B","timestamp":1000,"attachments":[]}\n'
     );
 
     await expect(runtime.app.dispatchReadyActions(1000)).resolves.toEqual([
       {
         handle: "+8613700000000",
-        message: "已保存联系人：+8613900000000 | 联系人B | /tmp/workspace-b",
+        message: expect.stringContaining("已保存联系人：+8613900000000 | 联系人B | "),
         exitCode: 0
       }
     ]);
@@ -107,7 +125,17 @@ describe("createLocalBridgeRuntime", () => {
     await expect(runtime.app.dispatchReadyActions(8000)).resolves.toEqual([
       {
         handle: "+8613900000000",
-        message: "新联系人已接入",
+        message: "已收到，Codex 正在处理…（任务 #job-1）",
+        exitCode: 0
+      }
+    ]);
+
+    await waitFor(() => state.jobs[0]?.status === "completed");
+
+    await expect(runtime.app.dispatchReadyActions(8001)).resolves.toEqual([
+      {
+        handle: "+8613900000000",
+        message: "任务 #job-1 已完成\n新联系人已接入",
         exitCode: 0
       }
     ]);
@@ -116,10 +144,16 @@ describe("createLocalBridgeRuntime", () => {
       "+8613800000000",
       "+8613900000000"
     ]);
+    expect(state.contacts[1]?.workspace).toContain(
+      "/.imessage-codex-agent/workspace/8613900000000"
+    );
     expect(request).toHaveBeenNthCalledWith(1, "thread/start", {
-      cwd: "/tmp/workspace-b",
+      cwd: expect.stringContaining("/.imessage-codex-agent/workspace/8613900000000"),
       experimentalRawEvents: false,
-      persistExtendedHistory: true
+      persistExtendedHistory: true,
+      approvalPolicy: "never",
+      sandbox: "workspace-write",
+      developerInstructions: expect.stringContaining("只允许在自己的 workspace 目录内")
     });
   });
 
@@ -193,7 +227,17 @@ describe("createLocalBridgeRuntime", () => {
     await expect(runtime.app.dispatchReadyActions(7000)).resolves.toEqual([
       {
         handle: "+8613800000000",
-        message: "这是 Codex 的回复",
+        message: "已收到，Codex 正在处理…（任务 #job-1）",
+        exitCode: 0
+      }
+    ]);
+
+    await waitFor(() => state.jobs[0]?.status === "completed");
+
+    await expect(runtime.app.dispatchReadyActions(7001)).resolves.toEqual([
+      {
+        handle: "+8613800000000",
+        message: "任务 #job-1 已完成\n这是 Codex 的回复",
         exitCode: 0
       }
     ]);
@@ -201,7 +245,10 @@ describe("createLocalBridgeRuntime", () => {
     expect(request).toHaveBeenNthCalledWith(1, "thread/start", {
       cwd: "/tmp/workspace-a",
       experimentalRawEvents: false,
-      persistExtendedHistory: true
+      persistExtendedHistory: true,
+      approvalPolicy: "never",
+      sandbox: "danger-full-access",
+      developerInstructions: expect.stringContaining("当前联系人是管理员")
     });
     expect(request).toHaveBeenNthCalledWith(2, "turn/start", {
       threadId: "thread-1",
@@ -230,9 +277,9 @@ describe("createLocalBridgeRuntime", () => {
     );
     expect(sendTextMessage).toHaveBeenCalledWith({
       to: "+8613800000000",
-      text: "这是 Codex 的回复"
+      text: "任务 #job-1 已完成\n这是 Codex 的回复"
     });
-    expect(state.contacts[0]?.threadId).toBe("thread-1");
+    expect(state.contacts[0]?.sessions[0]?.threadId).toBe("thread-1");
   });
 
   test("logs attachment staging failures and falls back to text-only turns", async () => {
@@ -292,7 +339,16 @@ describe("createLocalBridgeRuntime", () => {
       '{"id":"m1","chatId":"chat-1","sender":{"handle":"+8613800000000"},"text":"你好","timestamp":1000,"attachments":[{"path":"/tmp/missing-image.png"}]}\n'
     );
 
-    await runtime.app.dispatchReadyActions(7000);
+    await expect(runtime.app.dispatchReadyActions(7000)).resolves.toEqual([
+      {
+        handle: "+8613800000000",
+        message: "已收到，Codex 正在处理…（任务 #job-1）",
+        exitCode: 0
+      }
+    ]);
+
+    await waitFor(() => request.mock.calls.length >= 2);
+    await runtime.app.dispatchReadyActions(7001);
 
     expect(request).toHaveBeenNthCalledWith(2, "turn/start", {
       threadId: "thread-1",

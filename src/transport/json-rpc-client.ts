@@ -5,6 +5,12 @@ export type JsonRpcRequest = {
   params?: unknown;
 };
 
+export type JsonRpcNotification = {
+  jsonrpc: "2.0";
+  method: string;
+  params?: unknown;
+};
+
 type JsonRpcSuccessResponse = {
   id: number;
   result: unknown;
@@ -52,8 +58,23 @@ export function createJsonRpcClient(options: CreateJsonRpcClientOptions) {
         });
       });
 
-      await options.sendMessage(`${JSON.stringify(request)}\n`);
+      try {
+        await options.sendMessage(`${JSON.stringify(request)}\n`);
+      } catch (error) {
+        pendingRequests.delete(requestId);
+        throw error;
+      }
       return responsePromise;
+    },
+
+    async notify(method: string, params?: unknown): Promise<void> {
+      const notification: JsonRpcNotification = {
+        jsonrpc: "2.0",
+        method,
+        params
+      };
+
+      await options.sendMessage(`${JSON.stringify(notification)}\n`);
     },
 
     handleMessage(serializedMessage: string): void {

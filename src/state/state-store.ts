@@ -9,8 +9,17 @@ const contactSessionStateSchema = z.object({
   handle: z.string().min(1),
   name: z.string().min(1),
   workspace: z.string().min(1),
-  threadId: z.string().min(1).nullable(),
-  lastActiveAt: z.number().int().nonnegative().nullable()
+  currentSessionId: z.string().min(1).nullable(),
+  sessions: z.array(
+    z.object({
+      id: z.string().min(1),
+      name: z.string().min(1),
+      workspace: z.string().min(1),
+      threadId: z.string().min(1).nullable(),
+      lastActiveAt: z.number().int().nonnegative().nullable(),
+      createdAt: z.number().int().nonnegative()
+    })
+  )
 });
 
 const processedMessageStateSchema = z.object({
@@ -35,18 +44,76 @@ const attachmentRecordStateSchema = z.object({
   createdAt: z.number().int().nonnegative()
 });
 
-export const bridgeStateSchema = z.object({
+const jobLogEntryStateSchema = z.object({
+  at: z.number().int().nonnegative(),
+  message: z.string().min(1)
+});
+
+const backgroundJobStateSchema = z.object({
+  id: z.string().min(1),
+  handle: z.string().min(1),
+  sessionId: z.string().min(1).nullable(),
+  mode: z.enum(["foreground", "background"]),
+  workflow: z.enum(["generic", "autoresearch"]).default("generic"),
+  prompt: z.string().min(1),
+  title: z.string().min(1),
+  sourceMessageIds: z.array(z.string().min(1)).default([]),
+  attachmentPaths: z.array(z.string().min(1)),
+  status: z.enum([
+    "queued",
+    "running",
+    "waiting_input",
+    "completed",
+    "failed",
+    "cancelled"
+  ]),
+  createdAt: z.number().int().nonnegative(),
+  updatedAt: z.number().int().nonnegative(),
+  startedAt: z.number().int().nonnegative().nullable(),
+  finishedAt: z.number().int().nonnegative().nullable(),
+  currentStage: z.string().min(1).nullable(),
+  summary: z.string().min(1).nullable(),
+  errorMessage: z.string().min(1).nullable(),
+  threadId: z.string().min(1).nullable(),
+  turnId: z.string().min(1).nullable(),
+  lastHeartbeatAt: z.number().int().nonnegative().nullable(),
+  nextHeartbeatAt: z.number().int().nonnegative().nullable(),
+  slowNoticeSentAt: z.number().int().nonnegative().nullable(),
+  logs: z.array(jobLogEntryStateSchema)
+});
+
+const legacyContactStateSchema = z.object({
+  handle: z.string().min(1),
+  name: z.string().min(1),
+  workspace: z.string().min(1),
+  threadId: z.string().min(1).nullable(),
+  lastActiveAt: z.number().int().nonnegative().nullable()
+});
+
+const legacyBridgeStateSchema = z.object({
   version: z.literal(1),
-  contacts: z.array(contactSessionStateSchema),
+  contacts: z.array(legacyContactStateSchema),
   processedMessages: z.array(processedMessageStateSchema),
   outboundMessages: z.array(outboundMessageStateSchema),
   attachments: z.array(attachmentRecordStateSchema)
+});
+
+export const bridgeStateSchema = z.object({
+  version: z.literal(3),
+  contacts: z.array(contactSessionStateSchema),
+  processedMessages: z.array(processedMessageStateSchema),
+  outboundMessages: z.array(outboundMessageStateSchema),
+  attachments: z.array(attachmentRecordStateSchema),
+  nextJobSequence: z.number().int().positive(),
+  jobs: z.array(backgroundJobStateSchema)
 });
 
 export type ContactSessionState = z.infer<typeof contactSessionStateSchema>;
 export type ProcessedMessageState = z.infer<typeof processedMessageStateSchema>;
 export type OutboundMessageState = z.infer<typeof outboundMessageStateSchema>;
 export type AttachmentRecordState = z.infer<typeof attachmentRecordStateSchema>;
+export type JobLogEntryState = z.infer<typeof jobLogEntryStateSchema>;
+export type BackgroundJobState = z.infer<typeof backgroundJobStateSchema>;
 export type BridgeState = z.infer<typeof bridgeStateSchema>;
 
 function createContactState(contact: ContactConfig): ContactSessionState {
@@ -54,18 +121,20 @@ function createContactState(contact: ContactConfig): ContactSessionState {
     handle: contact.handle,
     name: contact.name,
     workspace: contact.workspace,
-    threadId: null,
-    lastActiveAt: null
+    currentSessionId: null,
+    sessions: []
   };
 }
 
 export function createInitialBridgeState(config: BridgeConfig): BridgeState {
   return {
-    version: 1,
+    version: 3,
     contacts: config.contacts.map(createContactState),
     processedMessages: [],
     outboundMessages: [],
-    attachments: []
+    attachments: [],
+    nextJobSequence: 1,
+    jobs: []
   };
 }
 
@@ -80,7 +149,7 @@ export async function loadBridgeState(
   try {
     const rawContent = await readFile(options.path, "utf8");
     const parsedJson: unknown = JSON.parse(rawContent);
-    return bridgeStateSchema.parse(parsedJson);
+    return parseBridgeState(parsedJson);
   } catch (error) {
     if (isMissingFileError(error)) {
       return createInitialBridgeState(options.config);
@@ -94,6 +163,64 @@ export async function loadBridgeState(
 
     throw error;
   }
+}
+
+function parseBridgeState(parsedJson: unknown): BridgeState {
+  const parsedV3 = bridgeStateSchema.safeParse(parsedJson);
+
+  if (parsedV3.success) {
+    return parsedV3.data;
+  }
+
+  const parsedV2Schema = z.object({
+    version: z.literal(2),
+    contacts: z.array(contactSessionStateSchema),
+    processedMessages: z.array(processedMessageStateSchema),
+    outboundMessages: z.array(outboundMessageStateSchema),
+    attachments: z.array(attachmentRecordStateSchema)
+  }).safeParse(parsedJson);
+
+  if (parsedV2Schema.success) {
+    return {
+      ...parsedV2Schema.data,
+      version: 3,
+      nextJobSequence: 1,
+      jobs: []
+    };
+  }
+
+  const parsedV1 = legacyBridgeStateSchema.safeParse(parsedJson);
+
+  if (parsedV1.success) {
+    return {
+      version: 3,
+      contacts: parsedV1.data.contacts.map((contact) => ({
+        handle: contact.handle,
+        name: contact.name,
+        workspace: contact.workspace,
+        currentSessionId: contact.threadId ? "session-1" : null,
+        sessions: contact.threadId
+          ? [
+              {
+                id: "session-1",
+                name: "默认会话",
+                workspace: contact.workspace,
+                threadId: contact.threadId,
+                lastActiveAt: contact.lastActiveAt,
+                createdAt: contact.lastActiveAt ?? 0
+              }
+            ]
+          : []
+      })),
+      processedMessages: parsedV1.data.processedMessages,
+      outboundMessages: parsedV1.data.outboundMessages,
+      attachments: parsedV1.data.attachments,
+      nextJobSequence: 1,
+      jobs: []
+    };
+  }
+
+  throw parsedV3.error;
 }
 
 type SaveBridgeStateOptions = {

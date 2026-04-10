@@ -87,7 +87,10 @@ describe("createCodexAppServerClient", () => {
     await client.startThread({
       cwd: "/tmp/workspace-b",
       experimentalRawEvents: true,
-      persistExtendedHistory: false
+      persistExtendedHistory: false,
+      approvalPolicy: "never",
+      sandbox: "workspace-write",
+      developerInstructions: "仅允许操作 workspace"
     });
 
     expect(invokeRequest).toHaveBeenCalledWith({
@@ -96,7 +99,44 @@ describe("createCodexAppServerClient", () => {
       params: {
         cwd: "/tmp/workspace-b",
         experimentalRawEvents: true,
-        persistExtendedHistory: false
+        persistExtendedHistory: false,
+        approvalPolicy: "never",
+        sandbox: "workspace-write",
+        developerInstructions: "仅允许操作 workspace"
+      }
+    });
+  });
+
+  test("passes thread/resume policy overrides through to app-server", async () => {
+    const invokeRequest = vi.fn(async () => ({
+      thread: {
+        id: "thread-9",
+        cwd: "/tmp/workspace-b"
+      }
+    }));
+    const client = createCodexAppServerClient({
+      invokeRequest,
+      nextRequestId: () => 34
+    });
+
+    await client.resumeThread({
+      threadId: "thread-9",
+      cwd: "/tmp/workspace-b",
+      approvalPolicy: "never",
+      sandbox: "danger-full-access",
+      developerInstructions: "管理员允许全部操作"
+    });
+
+    expect(invokeRequest).toHaveBeenCalledWith({
+      id: 34,
+      method: "thread/resume",
+      params: {
+        threadId: "thread-9",
+        cwd: "/tmp/workspace-b",
+        persistExtendedHistory: true,
+        approvalPolicy: "never",
+        sandbox: "danger-full-access",
+        developerInstructions: "管理员允许全部操作"
       }
     });
   });

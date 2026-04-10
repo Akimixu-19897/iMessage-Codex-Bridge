@@ -2,19 +2,32 @@ import type {
   BridgeAdminCommand,
   ParsedBridgeAdminCommand
 } from "./admin-command.js";
+import {
+  ensureContactWorkspace,
+  getDefaultWorkspaceRoot,
+  resolveDefaultContactWorkspace
+} from "./contact-workspace.js";
 
 type SessionManager = {
-  getSession(handle: string): {
+  getContact(handle: string): {
     handle: string;
     name: string;
     workspace: string;
-    threadId: string | null;
+    currentSessionId: string | null;
+    sessions: Array<{
+      id: string;
+      threadId: string | null;
+    }>;
   };
   listContacts(): Array<{
     handle: string;
     name: string;
     workspace: string;
-    threadId: string | null;
+    currentSessionId: string | null;
+    sessions: Array<{
+      id: string;
+      threadId: string | null;
+    }>;
   }>;
   upsertContact(params: {
     handle: string;
@@ -29,18 +42,34 @@ type SessionManager = {
     handle: string;
     name: string;
   };
+  updateWorkspace(params: {
+    handle: string;
+    workspace: string;
+  }): {
+    currentSessionId: string | null;
+  };
 };
 
 type CreateAdminCommandExecutorOptions = {
   sessionManager: SessionManager;
   saveState: () => Promise<void>;
+  ensureWorkspaceDirectory?: (path: string) => Promise<void>;
+  resolveWorkspaceForHandle?: (handle: string) => string;
 };
 
 export function createAdminCommandExecutor(
   options: CreateAdminCommandExecutorOptions
 ) {
+  const ensureWorkspaceDirectory =
+    options.ensureWorkspaceDirectory ?? ensureContactWorkspace;
+  const resolveWorkspaceForHandle =
+    options.resolveWorkspaceForHandle ?? resolveDefaultContactWorkspace;
+
   return {
-    async execute(command: ParsedBridgeAdminCommand): Promise<string> {
+    async execute(
+      command: ParsedBridgeAdminCommand,
+      actorHandle?: string
+    ): Promise<string> {
       if (command.type === "invalid") {
         return command.message;
       }
@@ -49,7 +78,7 @@ export function createAdminCommandExecutor(
         return [
           "支持命令：",
           "/bridge list",
-          "/bridge allow <handle> <name> <workspace>",
+          `/bridge allow <handle> <name> [workspace]（默认：${getDefaultWorkspaceRoot()}/<handle>）`,
           "/bridge workspace <handle> <workspace>",
           "/bridge remove <handle>"
         ].join("\n");
@@ -59,34 +88,66 @@ export function createAdminCommandExecutor(
         return formatContactList(options.sessionManager.listContacts());
       }
 
-      return executeStatefulCommand(command, options);
+      return executeStatefulCommand(command, {
+        ...options,
+        actorHandle,
+        ensureWorkspaceDirectory,
+        resolveWorkspaceForHandle
+      });
     }
   };
 }
 
 async function executeStatefulCommand(
-  command: Extract<BridgeAdminCommand, { type: "allow" | "workspace" | "remove" }>,
-  options: CreateAdminCommandExecutorOptions
+  command: Extract<
+    BridgeAdminCommand,
+    { type: "allow" | "workspace" | "workspace_default" | "remove" }
+  >,
+  options: CreateAdminCommandExecutorOptions & {
+    actorHandle?: string;
+    ensureWorkspaceDirectory: (path: string) => Promise<void>;
+    resolveWorkspaceForHandle: (handle: string) => string;
+  }
 ): Promise<string> {
   switch (command.type) {
     case "allow": {
+      const workspace =
+        command.workspace ?? options.resolveWorkspaceForHandle(command.handle);
+      await options.ensureWorkspaceDirectory(workspace);
       const contact = options.sessionManager.upsertContact({
         handle: command.handle,
         name: command.name,
-        workspace: command.workspace
+        workspace
       });
       await options.saveState();
       return `已保存联系人：${contact.handle} | ${contact.name} | ${contact.workspace}`;
     }
+    case "workspace_default": {
+      if (!options.actorHandle) {
+        return "workspace 命令格式：/bridge workspace <handle> <workspace>";
+      }
+
+      const workspace = options.resolveWorkspaceForHandle(options.actorHandle);
+      await options.ensureWorkspaceDirectory(workspace);
+      const updated = options.sessionManager.updateWorkspace({
+        handle: options.actorHandle,
+        workspace
+      });
+      await options.saveState();
+      return updated.currentSessionId
+        ? `已更新 workspace：${options.actorHandle} -> ${workspace}（当前会话将在新目录启动）`
+        : `已更新 workspace：${options.actorHandle} -> ${workspace}`;
+    }
     case "workspace": {
-      const existing = options.sessionManager.getSession(command.handle);
-      options.sessionManager.upsertContact({
+      await options.ensureWorkspaceDirectory(command.workspace);
+      const updated = options.sessionManager.updateWorkspace({
         handle: command.handle,
-        name: existing.name,
         workspace: command.workspace
       });
       await options.saveState();
-      return `已更新 workspace：${command.handle} -> ${command.workspace}`;
+      return updated.currentSessionId
+        ? `已更新 workspace：${command.handle} -> ${command.workspace}（当前会话将在新目录启动）`
+        : `已更新 workspace：${command.handle} -> ${command.workspace}`;
     }
     case "remove": {
       const removed = options.sessionManager.removeContact(command.handle);
@@ -101,12 +162,16 @@ function formatContactList(
     handle: string;
     name: string;
     workspace: string;
-    threadId: string | null;
+    currentSessionId: string | null;
+    sessions?: Array<{
+      id: string;
+      threadId: string | null;
+    }>;
   }>
 ): string {
   const lines = contacts.map(
     (contact) =>
-      `${contact.handle} | ${contact.name} | ${contact.workspace} | thread=${contact.threadId ?? "-"}`
+      `${contact.handle} | ${contact.name} | ${contact.workspace} | current=${contact.currentSessionId ?? "-"} | sessions=${contact.sessions?.length ?? 0}`
   );
 
   return ["当前联系人：", ...lines].join("\n");

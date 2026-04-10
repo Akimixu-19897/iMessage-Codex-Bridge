@@ -2,10 +2,12 @@ rejectionMessage: 请联系管理员开通权限。
 messageMergeWindowMs: 5000
 adminHandles:
   - "+8618352869601"
+  - "qiushi.xu@ks.casetekcorp.com"
 contacts:
   - handle: "+8618352869601"
     name: 管理员
-    workspace: "/Users/akimixu/Desktop/Projects/imessage-codex-bridge"
-  - handle: "+8613800000000"
-    name: 示例联系人
-    workspace: "/Users/akimixu/Desktop/Projects/imessage-codex-bridge"
+    workspace: "/Users/akimixu/.imessage-codex-agent/workspace/8618352869601"
+  - handle: "qiushi.xu@ks.casetekcorp.com"
+    name: "lux-80531901"
+    workspace: "/Users/akimixu/.imessage-codex-agent/workspace/qiushi.xu_ks.casetekcorp.com"
+ 

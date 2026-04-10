@@ -30,26 +30,28 @@ const TEST_CONFIG = {
 describe("state-store", () => {
   test("creates the initial state from config contacts", () => {
     expect(createInitialBridgeState(TEST_CONFIG)).toEqual({
-      version: 1,
+      version: 3,
       contacts: [
         {
           handle: "+8613800000000",
           name: "联系人 A",
           workspace: "/tmp/workspace-a",
-          threadId: null,
-          lastActiveAt: null
+          currentSessionId: null,
+          sessions: []
         },
         {
           handle: "+8613900000000",
           name: "联系人 B",
           workspace: "/tmp/workspace-b",
-          threadId: null,
-          lastActiveAt: null
+          currentSessionId: null,
+          sessions: []
         }
       ],
       processedMessages: [],
       outboundMessages: [],
-      attachments: []
+      attachments: [],
+      nextJobSequence: 1,
+      jobs: []
     });
   });
 
@@ -68,14 +70,23 @@ describe("state-store", () => {
     const tempDirectory = await mkdtemp(join(tmpdir(), "bridge-state-"));
     const statePath = join(tempDirectory, "state", "bridge-state.json");
     const state = {
-      version: 1 as const,
+      version: 3 as const,
       contacts: [
         {
           handle: "+8613800000000",
           name: "联系人 A",
           workspace: "/tmp/workspace-a",
-          threadId: "thread-1",
-          lastActiveAt: 123456
+          currentSessionId: "session-1",
+          sessions: [
+            {
+              id: "session-1",
+              name: "默认会话",
+              workspace: "/tmp/workspace-a",
+              threadId: "thread-1",
+              lastActiveAt: 123456,
+              createdAt: 120000
+            }
+          ]
         }
       ],
       processedMessages: [
@@ -102,7 +113,9 @@ describe("state-store", () => {
           stagedPath: "/tmp/staged/input.png",
           createdAt: 4000
         }
-      ]
+      ],
+      nextJobSequence: 2,
+      jobs: []
     };
 
     await saveBridgeState({
@@ -117,7 +130,64 @@ describe("state-store", () => {
       })
     ).resolves.toEqual(state);
 
-    await expect(readFile(statePath, "utf8")).resolves.toContain('"threadId": "thread-1"');
+    await expect(readFile(statePath, "utf8")).resolves.toContain('"currentSessionId": "session-1"');
+  });
+
+  test("migrates legacy version 1 state into version 3 sessions", async () => {
+    const tempDirectory = await mkdtemp(join(tmpdir(), "bridge-state-"));
+    const statePath = join(tempDirectory, "bridge-state.json");
+
+    await writeFile(
+      statePath,
+      JSON.stringify({
+        version: 1,
+        contacts: [
+          {
+            handle: "+8613800000000",
+            name: "联系人 A",
+            workspace: "/tmp/workspace-a",
+            threadId: "thread-1",
+            lastActiveAt: 123456
+          }
+        ],
+        processedMessages: [],
+        outboundMessages: [],
+        attachments: []
+      }),
+      "utf8"
+    );
+
+    await expect(
+      loadBridgeState({
+        path: statePath,
+        config: TEST_CONFIG
+      })
+    ).resolves.toEqual({
+      version: 3,
+      contacts: [
+        {
+          handle: "+8613800000000",
+          name: "联系人 A",
+          workspace: "/tmp/workspace-a",
+          currentSessionId: "session-1",
+          sessions: [
+            {
+              id: "session-1",
+              name: "默认会话",
+              workspace: "/tmp/workspace-a",
+              threadId: "thread-1",
+              lastActiveAt: 123456,
+              createdAt: 123456
+            }
+          ]
+        }
+      ],
+      processedMessages: [],
+      outboundMessages: [],
+      attachments: [],
+      nextJobSequence: 1,
+      jobs: []
+    });
   });
 
   test("fails fast when the state file is corrupted", async () => {

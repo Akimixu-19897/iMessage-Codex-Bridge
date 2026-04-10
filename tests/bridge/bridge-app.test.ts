@@ -61,7 +61,8 @@ describe("createBridgeApp", () => {
           messageIds: ["m2", "m3"],
           text: "第一句\n第二句",
           attachments: ["/tmp/a.png"],
-          lastReceivedAt: 2500
+          lastReceivedAt: 2500,
+          background: false
         }
       }
     ]);
@@ -80,13 +81,29 @@ describe("createBridgeApp", () => {
                 threadId: "admin-command",
                 turnId: "admin-command"
               }
-          : {
-              type: "reply" as const,
-              handle: action.batch.handle,
-              message: "这是 Codex 的回复",
-              threadId: "thread-1",
-              turnId: "turn-1"
-            }
+            : action.type === "session_command"
+              ? {
+                  type: "reply" as const,
+                  handle: action.handle,
+                  message: "会话命令执行完成",
+                  threadId: "session-command",
+                  turnId: "session-command"
+                }
+              : action.type === "submit"
+                ? {
+                    type: "reply" as const,
+                    handle: action.batch.handle,
+                    message: "这是 Codex 的回复",
+                    threadId: "thread-1",
+                    turnId: "turn-1"
+                  }
+                : {
+                    type: "reply" as const,
+                    handle: action.handle,
+                    message: "任务命令执行完成",
+                    threadId: "job-command",
+                    turnId: "job-command"
+                  }
       );
     const app = createBridgeApp(
       {
@@ -164,6 +181,65 @@ describe("createBridgeApp", () => {
         handle: "+8613800000000",
         message: "这是 Codex 的回复",
         exitCode: 0
+      }
+    ]);
+  });
+
+  test("routes whitelist session commands through the runtime executor hook", async () => {
+    const executeRuntimeActions = async (actions: BridgeRuntimeAction[]) =>
+      actions.map((action) =>
+        action.type === "session_command"
+          ? {
+              type: "reply" as const,
+              handle: action.handle,
+              message: "已切换到会话 #2：重构支付",
+              threadId: "session-command",
+              turnId: "session-command"
+            }
+          : action.type === "submit"
+            ? {
+              type: "reply" as const,
+              handle: action.batch.handle,
+              message: "unexpected",
+              threadId: "unexpected",
+              turnId: "unexpected"
+            }
+            : {
+              type: "reply" as const,
+              handle: action.handle,
+              message: "unexpected",
+              threadId: "unexpected",
+              turnId: "unexpected"
+            }
+      );
+    const app = createBridgeApp(
+      {
+        rejectionMessage: "请联系管理员开通权限。",
+        messageMergeWindowMs: 5000,
+        contacts: [
+          {
+            handle: "+8613800000000",
+            name: "联系人 A",
+            workspace: "/tmp/workspace-a"
+          }
+        ]
+      },
+      {
+        executeRuntimeActions
+      }
+    );
+
+    app.processImsgChunk(
+      '{"id":"m1","chatId":"chat-1","sender":{"handle":"+8613800000000"},"text":"/switch 2","timestamp":1000,"attachments":[]}\n'
+    );
+
+    await expect(app.executeReadyActions(1000)).resolves.toEqual([
+      {
+        type: "reply",
+        handle: "+8613800000000",
+        message: "已切换到会话 #2：重构支付",
+        threadId: "session-command",
+        turnId: "session-command"
       }
     ]);
   });

@@ -18,6 +18,8 @@ type PendingTurn = {
   text: string;
   status: string | null;
   resolve?: (value: CompletedTurnResult) => void;
+  reject?: (error: Error) => void;
+  onDelta?: (params: { delta: string; text: string }) => void;
 };
 
 export type CompletedTurnResult = {
@@ -27,16 +29,55 @@ export type CompletedTurnResult = {
   text: string;
 };
 
+const CANCELLED_TURN_RETENTION_MS = 5 * 60_000;
+
+class TurnCancelledError extends Error {
+  constructor(turnId: string) {
+    super(`turn cancelled: ${turnId}`);
+    this.name = "TurnCancelledError";
+  }
+}
+
 export function createTurnResponseCollector() {
   const pendingTurns = new Map<string, PendingTurn>();
+  const cancelledTurns = new Set<string>();
+  const cancelledTurnCleanupTimers = new Map<
+    string,
+    ReturnType<typeof setTimeout>
+  >();
+
+  function clearCancelledTurn(turnId: string): void {
+    const cleanupTimer = cancelledTurnCleanupTimers.get(turnId);
+
+    if (cleanupTimer) {
+      clearTimeout(cleanupTimer);
+      cancelledTurnCleanupTimers.delete(turnId);
+    }
+
+    cancelledTurns.delete(turnId);
+  }
 
   return {
-    waitForTurn(params: { threadId: string; turnId: string }): Promise<CompletedTurnResult> {
-      return new Promise<CompletedTurnResult>((resolve) => {
+    waitForTurn(params: {
+      threadId: string;
+      turnId: string;
+      onDelta?: (params: { delta: string; text: string }) => void;
+    }): Promise<CompletedTurnResult> {
+      return new Promise<CompletedTurnResult>((resolve, reject) => {
+        clearCancelledTurn(params.turnId);
         const existingTurn = pendingTurns.get(params.turnId);
 
         if (existingTurn) {
           existingTurn.resolve = resolve;
+          existingTurn.reject = reject;
+          existingTurn.onDelta = params.onDelta;
+
+          if (params.onDelta && existingTurn.text) {
+            params.onDelta({
+              delta: existingTurn.text,
+              text: existingTurn.text
+            });
+          }
 
           if (existingTurn.status) {
             pendingTurns.delete(params.turnId);
@@ -55,9 +96,26 @@ export function createTurnResponseCollector() {
           threadId: params.threadId,
           text: "",
           status: null,
-          resolve
+          resolve,
+          reject,
+          onDelta: params.onDelta
         });
       });
+    },
+
+    cancelTurn(turnId: string): void {
+      cancelledTurns.add(turnId);
+      clearTimeout(cancelledTurnCleanupTimers.get(turnId));
+      cancelledTurnCleanupTimers.set(
+        turnId,
+        setTimeout(() => {
+          cancelledTurnCleanupTimers.delete(turnId);
+          cancelledTurns.delete(turnId);
+        }, CANCELLED_TURN_RETENTION_MS)
+      );
+      const pendingTurn = pendingTurns.get(turnId);
+      pendingTurns.delete(turnId);
+      pendingTurn?.reject?.(new TurnCancelledError(turnId));
     },
 
     handleNotification(notification: {
@@ -66,6 +124,11 @@ export function createTurnResponseCollector() {
     }): void {
       if (notification.method === "item/agentMessage/delta") {
         const params = notification.params as AgentMessageDeltaNotification;
+
+        if (cancelledTurns.has(params.turnId)) {
+          return;
+        }
+
         const pendingTurn = pendingTurns.get(params.turnId);
 
         if (!pendingTurn) {
@@ -78,11 +141,20 @@ export function createTurnResponseCollector() {
         }
 
         pendingTurn.text += params.delta;
+        pendingTurn.onDelta?.({
+          delta: params.delta,
+          text: pendingTurn.text
+        });
         return;
       }
 
       if (notification.method === "turn/completed") {
         const params = notification.params as TurnCompletedNotification;
+
+        if (cancelledTurns.has(params.turn.id)) {
+          return;
+        }
+
         const pendingTurn = pendingTurns.get(params.turn.id);
 
         if (!pendingTurn) {

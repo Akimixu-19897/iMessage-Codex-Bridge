@@ -6,6 +6,15 @@ import {
   parseBridgeAdminCommand,
   type ParsedBridgeAdminCommand
 } from "./admin-command.js";
+import {
+  parseBridgeSessionCommand,
+  type ParsedBridgeSessionCommand
+} from "./session-command.js";
+import {
+  isLongTaskText,
+  parseBridgeJobCommand,
+  type ParsedBridgeJobCommand
+} from "./job-command.js";
 
 type RejectedAction = {
   type: "reject";
@@ -24,6 +33,18 @@ type CommandAction = {
   command: ParsedBridgeAdminCommand;
 };
 
+type SessionCommandAction = {
+  type: "session_command";
+  handle: string;
+  command: ParsedBridgeSessionCommand;
+};
+
+type JobCommandAction = {
+  type: "job_command";
+  handle: string;
+  command: ParsedBridgeJobCommand;
+};
+
 type IgnoredAction = {
   type: "ignored";
   reason: "duplicate" | "self";
@@ -35,6 +56,8 @@ export type HandleIncomingMessageResult =
   | RejectedAction
   | AcceptedAction
   | CommandAction
+  | SessionCommandAction
+  | JobCommandAction
   | IgnoredAction;
 
 type CreateBridgeServiceOptions = {
@@ -125,6 +148,30 @@ export function createBridgeService(
         };
       }
 
+      const parsedSessionCommand = message.text
+        ? parseBridgeSessionCommand(message.text)
+        : null;
+
+      if (parsedSessionCommand) {
+        return {
+          type: "session_command",
+          handle: message.handle,
+          command: parsedSessionCommand
+        };
+      }
+
+      const parsedJobCommand = message.text
+        ? parseBridgeJobCommand(message.text)
+        : null;
+
+      if (parsedJobCommand) {
+        return {
+          type: "job_command",
+          handle: message.handle,
+          command: parsedJobCommand
+        };
+      }
+
       messageBuffer.enqueue({
         handle: message.handle,
         messageId: message.messageId,
@@ -141,7 +188,17 @@ export function createBridgeService(
 
     flushReady(now: number) {
       pruneSeenMessageIds(now);
-      return messageBuffer.flushReady(now);
+      return messageBuffer.flushReady(now).map((batch) => ({
+        ...batch,
+        background: isLongTaskText(batch.text)
+      }));
+    },
+
+    flushHandle(handle: string) {
+      return messageBuffer.flushHandle(handle).map((batch) => ({
+        ...batch,
+        background: isLongTaskText(batch.text)
+      }));
     }
   };
 }

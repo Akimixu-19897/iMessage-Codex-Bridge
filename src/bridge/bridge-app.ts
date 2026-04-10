@@ -8,7 +8,8 @@ type CreateBridgeAppOptions = {
   adminHandles?: string[];
   executeRuntimeActions?: (actions: ReturnType<
     ReturnType<typeof createBridgeRuntime>["drainActions"]
-  >) => Promise<BridgeExecutionAction[]>;
+  >, now: number) => Promise<BridgeExecutionAction[]>;
+  pollExecutionActions?: (now: number) => Promise<BridgeExecutionAction[]>;
   dispatchExecutionActions?: (
     actions: BridgeExecutionAction[]
   ) => Promise<BridgeOutboundResult[]>;
@@ -41,7 +42,11 @@ export function createBridgeApp(
         return actions;
       }
 
-      return options.executeRuntimeActions(actions);
+      const executedActions = await options.executeRuntimeActions(actions, now);
+      const polledActions = options.pollExecutionActions
+        ? await options.pollExecutionActions(now)
+        : [];
+      return [...executedActions, ...polledActions];
     },
 
     async dispatchReadyActions(now: number) {
@@ -51,13 +56,17 @@ export function createBridgeApp(
         return actions;
       }
 
-      const executedActions = await options.executeRuntimeActions(actions);
+      const executedActions = await options.executeRuntimeActions(actions, now);
+      const polledActions = options.pollExecutionActions
+        ? await options.pollExecutionActions(now)
+        : [];
+      const allExecutedActions = [...executedActions, ...polledActions];
 
       if (!options.dispatchExecutionActions) {
-        return executedActions;
+        return allExecutedActions;
       }
 
-      return options.dispatchExecutionActions(executedActions);
+      return options.dispatchExecutionActions(allExecutedActions);
     }
   };
 }

@@ -17,7 +17,7 @@ const TEST_CONFIG = {
 };
 
 describe("createThreadService", () => {
-  test("starts a new thread for contacts without a persisted thread id", async () => {
+  test("starts a new thread for contacts without a persisted current session thread id", async () => {
     const state = createInitialBridgeState(TEST_CONFIG);
     const sessionManager = createSessionManager(state);
     const startThread = vi.fn(async () => ({
@@ -31,15 +31,22 @@ describe("createThreadService", () => {
       appServerClient: {
         startThread,
         resumeThread,
-        startTurn: vi.fn()
+        startTurn: vi.fn(),
+        interruptTurn: vi.fn()
       },
       sessionManager,
       saveState,
+      resolveThreadPolicy: () => ({
+        approvalPolicy: "never",
+        sandbox: "workspace-write",
+        developerInstructions: "仅允许操作 workspace"
+      }),
       now: () => 123456
     });
 
     await expect(service.ensureThread("+8613800000000")).resolves.toEqual({
       handle: "+8613800000000",
+      sessionId: "session-1",
       workspace: "/tmp/workspace-a",
       threadId: "thread-1",
       created: true,
@@ -53,17 +60,30 @@ describe("createThreadService", () => {
     expect(startThread).toHaveBeenCalledWith({
       cwd: "/tmp/workspace-a",
       experimentalRawEvents: false,
-      persistExtendedHistory: true
+      persistExtendedHistory: true,
+      approvalPolicy: "never",
+      sandbox: "workspace-write",
+      developerInstructions: "仅允许操作 workspace"
     });
     expect(resumeThread).not.toHaveBeenCalled();
-    expect(state.contacts[0]?.threadId).toBe("thread-1");
-    expect(state.contacts[0]?.lastActiveAt).toBe(123456);
+    expect(state.contacts[0]?.currentSessionId).toBe("session-1");
+    expect(state.contacts[0]?.sessions[0]?.threadId).toBe("thread-1");
     expect(saveState).toHaveBeenCalledTimes(1);
   });
 
-  test("resumes an existing thread for contacts with a persisted thread id", async () => {
+  test("resumes an existing thread for contacts with a persisted current session thread id", async () => {
     const state = createInitialBridgeState(TEST_CONFIG);
-    state.contacts[0]!.threadId = "thread-1";
+    state.contacts[0]!.currentSessionId = "session-1";
+    state.contacts[0]!.sessions = [
+      {
+        id: "session-1",
+        name: "默认会话",
+        workspace: "/tmp/workspace-a",
+        threadId: "thread-1",
+        createdAt: 100,
+        lastActiveAt: 100
+      }
+    ];
     const sessionManager = createSessionManager(state);
     const startThread = vi.fn();
     const resumeThread = vi.fn(async () => ({
@@ -76,15 +96,22 @@ describe("createThreadService", () => {
       appServerClient: {
         startThread,
         resumeThread,
-        startTurn: vi.fn()
+        startTurn: vi.fn(),
+        interruptTurn: vi.fn()
       },
       sessionManager,
       saveState,
+      resolveThreadPolicy: () => ({
+        approvalPolicy: "never",
+        sandbox: "danger-full-access",
+        developerInstructions: "管理员允许全部操作"
+      }),
       now: () => 654321
     });
 
     await expect(service.ensureThread("+8613800000000")).resolves.toEqual({
       handle: "+8613800000000",
+      sessionId: "session-1",
       workspace: "/tmp/workspace-a",
       threadId: "thread-1",
       created: false,
@@ -99,9 +126,12 @@ describe("createThreadService", () => {
     expect(resumeThread).toHaveBeenCalledWith({
       threadId: "thread-1",
       cwd: "/tmp/workspace-a",
-      persistExtendedHistory: true
+      persistExtendedHistory: true,
+      approvalPolicy: "never",
+      sandbox: "danger-full-access",
+      developerInstructions: "管理员允许全部操作"
     });
-    expect(state.contacts[0]?.lastActiveAt).toBe(654321);
+    expect(state.contacts[0]?.sessions[0]?.lastActiveAt).toBe(654321);
     expect(saveState).toHaveBeenCalledTimes(1);
   });
 
@@ -110,7 +140,8 @@ describe("createThreadService", () => {
       appServerClient: {
         startThread: vi.fn(),
         resumeThread: vi.fn(),
-        startTurn: vi.fn()
+        startTurn: vi.fn(),
+        interruptTurn: vi.fn()
       },
       sessionManager: createSessionManager(createInitialBridgeState(TEST_CONFIG))
     });

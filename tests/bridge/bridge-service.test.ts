@@ -106,7 +106,8 @@ describe("createBridgeService", () => {
         messageIds: ["m1", "m2"],
         text: "第一句\n第二句",
         attachments: ["/tmp/a.png"],
-        lastReceivedAt: 2000
+        lastReceivedAt: 2000,
+        background: false
       }
     ]);
   });
@@ -164,7 +165,8 @@ describe("createBridgeService", () => {
         messageIds: ["m1"],
         text: "第一句",
         attachments: [],
-        lastReceivedAt: 1000
+        lastReceivedAt: 1000,
+        background: false
       }
     ]);
   });
@@ -235,5 +237,136 @@ describe("createBridgeService", () => {
         type: "list"
       }
     });
+  });
+
+  test("returns job command actions for whitelisted contacts", () => {
+    const service = createBridgeService({
+      rejectionMessage: "请联系管理员开通权限。",
+      messageMergeWindowMs: 5000,
+      contacts: [
+        {
+          handle: "+8613800000000",
+          name: "联系人 A",
+          workspace: "/tmp/workspace-a"
+        }
+      ]
+    });
+
+    expect(
+      service.handleIncomingMessage({
+        messageId: "m-job",
+        chatId: "chat-1",
+        handle: "+8613800000000",
+        senderName: "联系人 A",
+        text: "/jobs",
+        receivedAt: 1000,
+        attachmentPaths: [],
+        isFromMe: false
+      })
+    ).toEqual({
+      type: "job_command",
+      handle: "+8613800000000",
+      command: {
+        type: "jobs"
+      }
+    });
+  });
+
+  test("marks merged batches with background=true when text matches long task heuristics", () => {
+    const service = createBridgeService({
+      rejectionMessage: "请联系管理员开通权限。",
+      messageMergeWindowMs: 5000,
+      contacts: [
+        {
+          handle: "+8613800000000",
+          name: "联系人 A",
+          workspace: "/tmp/workspace-a"
+        }
+      ]
+    });
+
+    service.handleIncomingMessage({
+      messageId: "m1",
+      chatId: "chat-1",
+      handle: "+8613800000000",
+      senderName: "联系人 A",
+      text: "请用 codex-autoresearch 持续研究这个仓库",
+      receivedAt: 1000,
+      attachmentPaths: [],
+      isFromMe: false
+    });
+
+    expect(service.flushReady(7000)).toEqual([
+      {
+        handle: "+8613800000000",
+        messageIds: ["m1"],
+        text: "请用 codex-autoresearch 持续研究这个仓库",
+        attachments: [],
+        lastReceivedAt: 1000,
+        background: true
+      }
+    ]);
+  });
+
+  test("flushes buffered messages for a specific contact immediately", () => {
+    const service = createBridgeService({
+      rejectionMessage: "请联系管理员开通权限。",
+      messageMergeWindowMs: 5000,
+      contacts: [
+        {
+          handle: "+8613800000000",
+          name: "联系人 A",
+          workspace: "/tmp/workspace-a"
+        },
+        {
+          handle: "+8613900000000",
+          name: "联系人 B",
+          workspace: "/tmp/workspace-b"
+        }
+      ]
+    });
+
+    service.handleIncomingMessage({
+      messageId: "m1",
+      chatId: "chat-1",
+      handle: "+8613800000000",
+      senderName: "联系人 A",
+      text: "旧会话消息",
+      receivedAt: 1000,
+      attachmentPaths: [],
+      isFromMe: false
+    });
+    service.handleIncomingMessage({
+      messageId: "m2",
+      chatId: "chat-2",
+      handle: "+8613900000000",
+      senderName: "联系人 B",
+      text: "B 的消息",
+      receivedAt: 1200,
+      attachmentPaths: [],
+      isFromMe: false
+    });
+
+    expect(service.flushHandle("+8613800000000")).toEqual([
+      {
+        handle: "+8613800000000",
+        messageIds: ["m1"],
+        text: "旧会话消息",
+        attachments: [],
+        lastReceivedAt: 1000,
+        background: false
+      }
+    ]);
+
+    expect(service.flushReady(7000)).toEqual([
+      {
+        handle: "+8613900000000",
+        messageIds: ["m2"],
+        text: "B 的消息",
+        attachments: [],
+        lastReceivedAt: 1200,
+        background: false
+      }
+    ]);
   });
 });

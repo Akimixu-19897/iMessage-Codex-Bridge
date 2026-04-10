@@ -23,6 +23,10 @@ export function createStdioJsonRpc(options: CreateStdioJsonRpcOptions) {
       return jsonRpcClient.request(method, params);
     },
 
+    notify(method: string, params?: unknown): Promise<void> {
+      return jsonRpcClient.notify(method, params);
+    },
+
     pushStdoutChunk(chunk: string): void {
       buffer += chunk;
 

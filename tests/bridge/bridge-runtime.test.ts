@@ -58,7 +58,8 @@ describe("createBridgeRuntime", () => {
           messageIds: ["m1", "m2"],
           text: "第一句\n第二句",
           attachments: ["/tmp/a.png"],
-          lastReceivedAt: 2000
+          lastReceivedAt: 2000,
+          background: false
         }
       }
     ]);
@@ -92,7 +93,8 @@ describe("createBridgeRuntime", () => {
           messageIds: ["m1"],
           text: "第一句",
           attachments: [],
-          lastReceivedAt: 1000
+          lastReceivedAt: 1000,
+          background: false
         }
       }
     ]);
@@ -122,6 +124,78 @@ describe("createBridgeRuntime", () => {
         handle: "+8613700000000",
         command: {
           type: "list"
+        }
+      }
+    ]);
+  });
+
+  test("emits session command actions for whitelisted contacts", () => {
+    const runtime = createBridgeRuntime({
+      rejectionMessage: "请联系管理员开通权限。",
+      messageMergeWindowMs: 5000,
+      contacts: [
+        {
+          handle: "+8613800000000",
+          name: "联系人 A",
+          workspace: "/tmp/workspace-a"
+        }
+      ]
+    });
+
+    runtime.pushImsgChunk(
+      '{"id":"m1","chatId":"chat-1","sender":{"handle":"+8613800000000","displayName":"联系人 A"},"text":"/new 重构支付","timestamp":1000,"attachments":[]}\n'
+    );
+
+    expect(runtime.drainActions(1000)).toEqual([
+      {
+        type: "session_command",
+        handle: "+8613800000000",
+        command: {
+          type: "new",
+          name: "重构支付"
+        }
+      }
+    ]);
+  });
+
+  test("flushes buffered message before session command to avoid cross-session delivery", () => {
+    const runtime = createBridgeRuntime({
+      rejectionMessage: "请联系管理员开通权限。",
+      messageMergeWindowMs: 5000,
+      contacts: [
+        {
+          handle: "+8613800000000",
+          name: "联系人 A",
+          workspace: "/tmp/workspace-a"
+        }
+      ]
+    });
+
+    runtime.pushImsgChunk(
+      '{"id":"m1","chatId":"chat-1","sender":{"handle":"+8613800000000","displayName":"联系人 A"},"text":"旧会话里的最后一条","timestamp":1000,"attachments":[]}\n'
+    );
+    runtime.pushImsgChunk(
+      '{"id":"m2","chatId":"chat-1","sender":{"handle":"+8613800000000","displayName":"联系人 A"},"text":"/new 新会话","timestamp":1200,"attachments":[]}\n'
+    );
+
+    expect(runtime.drainActions(7000)).toEqual([
+      {
+        type: "submit",
+        batch: {
+          handle: "+8613800000000",
+          messageIds: ["m1"],
+          text: "旧会话里的最后一条",
+          attachments: [],
+          lastReceivedAt: 1000,
+          background: false
+        }
+      },
+      {
+        type: "session_command",
+        handle: "+8613800000000",
+        command: {
+          type: "new",
+          name: "新会话"
         }
       }
     ]);

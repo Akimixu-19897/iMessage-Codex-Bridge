@@ -73,4 +73,43 @@ describe("createMessageBuffer", () => {
       }
     ]);
   });
+
+  test("flushes a specific contact buffer immediately", () => {
+    const buffer = createMessageBuffer(5000);
+
+    buffer.enqueue({
+      handle: "+8613800000000",
+      messageId: "m1",
+      text: "A",
+      attachments: [],
+      receivedAt: 1000
+    });
+    buffer.enqueue({
+      handle: "+8613900000000",
+      messageId: "m2",
+      text: "B",
+      attachments: [],
+      receivedAt: 1500
+    });
+
+    expect(buffer.flushHandle("+8613800000000")).toEqual([
+      {
+        handle: "+8613800000000",
+        messageIds: ["m1"],
+        text: "A",
+        attachments: [],
+        lastReceivedAt: 1000
+      }
+    ]);
+
+    expect(buffer.flushReady(7000)).toEqual([
+      {
+        handle: "+8613900000000",
+        messageIds: ["m2"],
+        text: "B",
+        attachments: [],
+        lastReceivedAt: 1500
+      }
+    ]);
+  });
 });
