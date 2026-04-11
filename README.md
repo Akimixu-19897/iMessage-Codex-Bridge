@@ -60,15 +60,15 @@ pnpm install
 rejectionMessage: 请联系管理员开通权限。
 messageMergeWindowMs: 5000
 adminHandles:
-  - "+8618352869601"
-  - "qiushi.xu@ks.casetekcorp.com"
+  - "+8613800000000"
+  - "admin@example.com"
 contacts:
-  - handle: "+8618352869601"
+  - handle: "+8613800000000"
     name: 管理员
-    workspace: "/Users/akimixu/.imessage-codex-agent/workspace/8618352869601"
-  - handle: "qiushi.xu@ks.casetekcorp.com"
-    name: "lux-80531901"
-    workspace: "/Users/akimixu/.imessage-codex-agent/workspace/qiushi.xu_ks.casetekcorp.com"
+    workspace: "/Users/yourname/.imessage-codex-agent/workspace/8613800000000"
+  - handle: "admin@example.com"
+    name: "demo-user"
+    workspace: "/Users/yourname/.imessage-codex-agent/workspace/admin_example.com"
 ```
 
 字段说明：
@@ -156,8 +156,8 @@ bridge 启动时会：
 示例：
 
 ```text
-/bridge allow "Qiushi.Xu@ks.casetekcorp.com" "lux-80531901"
-/bridge workspace "+8618352869601" "/Users/akimixu/.imessage-codex-agent/workspace/admin-main"
+/bridge allow "user@example.com" "demo-user"
+/bridge workspace "+8613800000000" "/Users/yourname/.imessage-codex-agent/workspace/admin-main"
 ```
 
 ## 会话命令
