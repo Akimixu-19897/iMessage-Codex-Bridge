@@ -2,12 +2,8 @@ rejectionMessage: 请联系管理员开通权限。
 messageMergeWindowMs: 5000
 adminHandles:
   - "+8613800000000"
-  - "admin@example.com"
 contacts:
   - handle: "+8613800000000"
     name: 管理员
     workspace: "/Users/yourname/.imessage-codex-agent/workspace/8613800000000"
-  - handle: "admin@example.com"
-    name: "demo-user"
-    workspace: "/Users/yourname/.imessage-codex-agent/workspace/admin_example.com"
  

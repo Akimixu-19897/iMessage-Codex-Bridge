@@ -52,7 +52,12 @@ pnpm install
 
 ### 2. 准备配置
 
-默认读取 `config/bridge.example.yaml`。
+启动时会优先读取 `config/bridge.local.yaml`；如果本地私有配置不存在，才回退到 `config/bridge.example.yaml`。
+
+推荐做法：
+
+- `config/bridge.example.yaml`：放匿名示例，适合提交到 Git
+- `config/bridge.local.yaml`：放你自己机器上的真实号码、邮箱、管理员名单和 workspace，不提交到 Git
 
 当前示例配置：
 
@@ -61,14 +66,10 @@ rejectionMessage: 请联系管理员开通权限。
 messageMergeWindowMs: 5000
 adminHandles:
   - "+8613800000000"
-  - "admin@example.com"
 contacts:
   - handle: "+8613800000000"
     name: 管理员
     workspace: "/Users/yourname/.imessage-codex-agent/workspace/8613800000000"
-  - handle: "admin@example.com"
-    name: "demo-user"
-    workspace: "/Users/yourname/.imessage-codex-agent/workspace/admin_example.com"
 ```
 
 字段说明：
@@ -81,6 +82,8 @@ contacts:
 | `contacts[].handle` | 白名单联系人标识，支持手机号或 iMessage 邮箱 |
 | `contacts[].name` | 联系人别名，仅用于展示 |
 | `contacts[].workspace` | 该联系人的默认 Codex 工作目录 |
+
+如果你已经在本机使用真实配置，建议新建 `config/bridge.local.yaml`，内容可以从 `config/bridge.example.yaml` 复制后按本机实际值修改。
 
 ### 3. 构建并启动
 
@@ -266,7 +269,7 @@ pnpm build
 
 - 目前只支持**一对一联系人**，不支持群聊
 - 目前只支持**图片理解输入**，不支持图片生成或图片回传
-- 当前默认读取 `config/bridge.example.yaml`，还没有单独做正式的多环境配置切换
+- 当前配置加载规则是“`bridge.local.yaml` 优先，`bridge.example.yaml` 回退”，但还没有做更正式的多环境配置体系
 - `imsg send` 失败会记日志，但不会做自动重试队列
 - 状态文件损坏时会直接报错退出，需要人工修复 `data/bridge-state.json`
 - 长任务能力已完成代码与自动化验证，但还建议再做一次真实手机端到端长跑验收

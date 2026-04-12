@@ -2,6 +2,7 @@ node_modules/
 dist/
 coverage/
 .tmp/
+config/bridge.local.yaml
 data/state/
 data/attachments/
 .DS_Store

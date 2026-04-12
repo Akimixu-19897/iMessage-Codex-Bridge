@@ -1,9 +1,13 @@
+import { access } from "node:fs/promises";
+
 import { bootstrapBridge, type BootstrapBridgeResult } from "./bridge/bootstrap-bridge.js";
 import { startLocalBridge } from "./bridge/start-local-bridge.js";
 import type { BridgeConfig } from "./config/schema.js";
 import { loadConfig } from "./config/load-config.js";
 
-const DEFAULT_CONFIG_PATH = new URL("../config/bridge.example.yaml", import.meta.url)
+const DEFAULT_CONFIG_PATH = new URL("../config/bridge.local.yaml", import.meta.url)
+  .pathname;
+const FALLBACK_CONFIG_PATH = new URL("../config/bridge.example.yaml", import.meta.url)
   .pathname;
 const DEFAULT_STATE_PATH = new URL("../data/bridge-state.json", import.meta.url)
   .pathname;
@@ -30,12 +34,13 @@ export async function runMain(options: RunMainOptions = {}): Promise<number> {
   const error = options.error ?? console.error;
   const statePath = DEFAULT_STATE_PATH;
   const attachmentDirectory = DEFAULT_ATTACHMENT_DIRECTORY;
+  const configPath = await resolveConfigPath();
   const startBridge = options.startBridge ?? startLocalBridge;
   const bootstrap =
     options.bootstrap ??
     (() =>
       bootstrapBridge({
-        configPath: DEFAULT_CONFIG_PATH,
+        configPath,
         loadConfig,
         detectImsgAvailability: async () => {
           const { createImsgClient } = await import("./adapters/imsg/imsg-client.js");
@@ -72,6 +77,15 @@ export async function runMain(options: RunMainOptions = {}): Promise<number> {
     )
   );
   return 0;
+}
+
+async function resolveConfigPath(): Promise<string> {
+  try {
+    await access(DEFAULT_CONFIG_PATH);
+    return DEFAULT_CONFIG_PATH;
+  } catch {
+    return FALLBACK_CONFIG_PATH;
+  }
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
