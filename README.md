@@ -39,6 +39,8 @@ flowchart LR
 > [!IMPORTANT]
 > 这个 bridge 不是云服务，也不是公网部署方案。它依赖**这台 Mac 本机**的 iMessage 和 `codex app-server` 持续运行。
 
+生产环境推荐用 macOS `launchd` 常驻运行；查看状态、停止、重启、卸载和日志命令详见 [本机生产部署](docs/production.md)。
+
 ## 快速开始
 
 ### 1. 安装依赖
@@ -74,14 +76,14 @@ contacts:
 
 字段说明：
 
-| 字段 | 说明 |
-| --- | --- |
-| `rejectionMessage` | 非白名单联系人收到的固定回复 |
-| `messageMergeWindowMs` | 同一联系人消息合并窗口，单位毫秒 |
-| `adminHandles` | 可执行管理员命令的联系人列表 |
-| `contacts[].handle` | 白名单联系人标识，支持手机号或 iMessage 邮箱 |
-| `contacts[].name` | 联系人别名，仅用于展示 |
-| `contacts[].workspace` | 该联系人的默认 Codex 工作目录 |
+| 字段                   | 说明                                         |
+| ---------------------- | -------------------------------------------- |
+| `rejectionMessage`     | 非白名单联系人收到的固定回复                 |
+| `messageMergeWindowMs` | 同一联系人消息合并窗口，单位毫秒             |
+| `adminHandles`         | 可执行管理员命令的联系人列表                 |
+| `contacts[].handle`    | 白名单联系人标识，支持手机号或 iMessage 邮箱 |
+| `contacts[].name`      | 联系人别名，仅用于展示                       |
+| `contacts[].workspace` | 该联系人的默认 Codex 工作目录                |
 
 如果你已经在本机使用真实配置，建议新建 `config/bridge.local.yaml`，内容可以从 `config/bridge.example.yaml` 复制后按本机实际值修改。
 
@@ -96,6 +98,36 @@ pnpm build
 pnpm dev
 ```
 
+常用工程命令：
+
+```bash
+npm run typecheck
+npm run lint
+npm run format:check
+npm test
+npm run check
+npm run doctor
+```
+
+`doctor` 会检查配置文件、`imsg`、`codex`、状态目录、图片暂存目录和联系人 workspace 是否可用。
+
+### 4. 可选运行参数
+
+可以用环境变量覆盖默认运行路径和日志级别：
+
+| 环境变量                | 说明                                |
+| ----------------------- | ----------------------------------- |
+| `BRIDGE_CONFIG_PATH`    | 覆盖配置文件路径                    |
+| `BRIDGE_STATE_PATH`     | 覆盖状态文件路径                    |
+| `BRIDGE_ATTACHMENT_DIR` | 覆盖图片暂存目录                    |
+| `BRIDGE_LOG_LEVEL`      | 日志级别：`info`、`debug`、`silent` |
+
+默认 `info` 日志会隐藏消息正文和回复正文，只输出字节数、脱敏 handle、退出码和消息长度。需要排查原始 `imsg` 输入时，可临时使用：
+
+```bash
+BRIDGE_LOG_LEVEL=debug npm run dev
+```
+
 启动成功后会输出类似日志：
 
 ```text
@@ -104,6 +136,7 @@ bridge ready: {
   "contactCount": 2,
   "statePath": ".../data/bridge-state.json",
   "attachmentDirectory": ".../data/attachments",
+  "logLevel": "info",
   "watchArgs": ["watch", "--json", "--attachments"]
 }
 ```

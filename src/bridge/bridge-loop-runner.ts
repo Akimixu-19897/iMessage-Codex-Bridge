@@ -17,6 +17,7 @@ type CreateBridgeLoopRunnerOptions = {
   now?: () => number;
   logInfo?: (...args: unknown[]) => void;
   logError?: (...args: unknown[]) => void;
+  logLevel?: "silent" | "info" | "debug";
   flushIntervalMs?: number;
   setIntervalFn?: (
     callback: () => void,
@@ -29,6 +30,7 @@ export function createBridgeLoopRunner(options: CreateBridgeLoopRunnerOptions) {
   const now = options.now ?? Date.now;
   const logInfo = options.logInfo ?? console.log;
   const logError = options.logError ?? console.error;
+  const logLevel = options.logLevel ?? "info";
   const flushIntervalMs = options.flushIntervalMs ?? 1000;
   const setIntervalFn = options.setIntervalFn ?? setInterval;
   const clearIntervalFn = options.clearIntervalFn ?? clearInterval;
@@ -45,7 +47,11 @@ export function createBridgeLoopRunner(options: CreateBridgeLoopRunnerOptions) {
       .then(() => options.app.dispatchReadyActions(now()))
       .then((results) => {
         if (Array.isArray(results) && results.length > 0) {
-          logInfo("bridge dispatch result:", JSON.stringify(results, null, 2));
+          if (logLevel === "debug") {
+            logInfo("bridge dispatch result:", JSON.stringify(results, null, 2));
+          } else if (logLevel === "info") {
+            logInfo("bridge dispatch result:", redactDispatchResults(results));
+          }
         }
       });
 
@@ -70,7 +76,13 @@ export function createBridgeLoopRunner(options: CreateBridgeLoopRunnerOptions) {
       }, flushIntervalMs);
       const watchSession = options.watchHost.start({
         onChunk: (chunk) => {
-          logInfo("bridge inbound chunk:", chunk.trim());
+          if (logLevel === "debug") {
+            logInfo("bridge inbound chunk:", chunk.trim());
+          } else if (logLevel === "info") {
+            logInfo("bridge inbound chunk received:", {
+              bytes: Buffer.byteLength(chunk, "utf8")
+            });
+          }
           try {
             options.app.processImsgChunk(chunk);
           } catch (error: unknown) {
@@ -89,4 +101,32 @@ export function createBridgeLoopRunner(options: CreateBridgeLoopRunnerOptions) {
       };
     }
   };
+}
+
+function redactDispatchResults(results: unknown[]): unknown[] {
+  return results.map((result) => {
+    if (!isRecord(result)) {
+      return result;
+    }
+
+    return {
+      exitCode: result.exitCode,
+      handle:
+        typeof result.handle === "string" ? redactHandle(result.handle) : result.handle,
+      messageLength:
+        typeof result.message === "string" ? result.message.length : undefined
+    };
+  });
+}
+
+function redactHandle(handle: string): string {
+  if (handle.length <= 8) {
+    return "***";
+  }
+
+  return `${handle.slice(0, 5)}…${handle.slice(-4)}`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }

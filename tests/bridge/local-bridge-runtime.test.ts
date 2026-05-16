@@ -167,7 +167,7 @@ describe("createLocalBridgeRuntime", () => {
       stdout: '{"ok":true}',
       stderr: ""
     }));
-    const request = vi.fn(async (method: string, params?: unknown) => {
+    const request = vi.fn(async (method: string, _params?: unknown) => {
       if (method === "thread/start") {
         return {
           thread: {

@@ -19,9 +19,7 @@ type BootstrapReadyResult = {
   config: BridgeConfig;
 };
 
-export type BootstrapBridgeResult =
-  | BootstrapBlockedResult
-  | BootstrapReadyResult;
+export type BootstrapBridgeResult = BootstrapBlockedResult | BootstrapReadyResult;
 
 export async function bootstrapBridge(
   options: BootstrapBridgeOptions

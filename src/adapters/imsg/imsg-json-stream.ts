@@ -8,9 +8,7 @@ type CreateImsgJsonStreamParserOptions = {
   onMessage: (message: NormalizedInboundMessage) => void;
 };
 
-export function createImsgJsonStreamParser(
-  options: CreateImsgJsonStreamParserOptions
-) {
+export function createImsgJsonStreamParser(options: CreateImsgJsonStreamParserOptions) {
   let buffer = "";
 
   return {

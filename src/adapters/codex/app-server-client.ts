@@ -34,14 +34,16 @@ export type CodexAppServerClient = {
   interruptTurn(params: { threadId: string; turnId: string }): Promise<void>;
 };
 
-export type TurnInputItem = {
-  type: "text";
-  text: string;
-  text_elements?: unknown[];
-} | {
-  type: "localImage";
-  path: string;
-};
+export type TurnInputItem =
+  | {
+      type: "text";
+      text: string;
+      text_elements?: unknown[];
+    }
+  | {
+      type: "localImage";
+      path: string;
+    };
 
 export type TurnStartParams = {
   threadId: string;
@@ -110,9 +112,7 @@ type AppServerTurnEnvelope = {
   turn: CodexTurn;
 };
 
-export type AppServerRequestInvoker = (
-  request: AppServerRequest
-) => Promise<unknown>;
+export type AppServerRequestInvoker = (request: AppServerRequest) => Promise<unknown>;
 
 type CreateCodexAppServerClientOptions = {
   invokeRequest: AppServerRequestInvoker;
@@ -184,10 +184,7 @@ export function createCodexAppServerClient(
       return expectTurnEnvelope(response).turn;
     },
 
-    async interruptTurn(params: {
-      threadId: string;
-      turnId: string;
-    }): Promise<void> {
+    async interruptTurn(params: { threadId: string; turnId: string }): Promise<void> {
       await options.invokeRequest({
         id: nextRequestId(),
         method: "turn/interrupt",
@@ -207,9 +204,7 @@ function defaultNextRequestId(): number {
   return requestSequence;
 }
 
-function expectThreadEnvelope(
-  response: unknown
-): AppServerThreadEnvelope {
+function expectThreadEnvelope(response: unknown): AppServerThreadEnvelope {
   if (!response || typeof response !== "object" || !("thread" in response)) {
     throw new Error("app-server 返回了意外的响应类型，期望 thread");
   }
@@ -217,9 +212,7 @@ function expectThreadEnvelope(
   return response as AppServerThreadEnvelope;
 }
 
-function expectTurnEnvelope(
-  response: unknown
-): AppServerTurnEnvelope {
+function expectTurnEnvelope(response: unknown): AppServerTurnEnvelope {
   if (!response || typeof response !== "object" || !("turn" in response)) {
     throw new Error("app-server 返回了意外的响应类型，期望 turn");
   }

@@ -1,8 +1,5 @@
 import type { ResolvedCodexThread } from "./thread-service.js";
-import type {
-  CodexAppServerClient,
-  CodexTurn
-} from "./app-server-client.js";
+import type { CodexAppServerClient, CodexTurn } from "./app-server-client.js";
 
 type CreateTurnServiceOptions = {
   appServerClient: CodexAppServerClient;

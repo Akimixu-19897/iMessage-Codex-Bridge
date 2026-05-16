@@ -52,7 +52,9 @@ describe("parseBridgeAdminCommand", () => {
   });
 
   test("parses allow commands without explicit workspace", () => {
-    expect(parseBridgeAdminCommand("/bridge allow Qiushi.Xu@ks.casetekcorp.com lux-80531901")).toEqual({
+    expect(
+      parseBridgeAdminCommand("/bridge allow Qiushi.Xu@ks.casetekcorp.com lux-80531901")
+    ).toEqual({
       type: "allow",
       handle: "Qiushi.Xu@ks.casetekcorp.com",
       name: "lux-80531901",

@@ -82,7 +82,7 @@ describe("createBridgeLoopRunner", () => {
     expect(dispatchReadyActions).toHaveBeenNthCalledWith(2, 9000);
   });
 
-  test("logs inbound chunks and non-empty dispatch results for foreground debugging", async () => {
+  test("redacts inbound chunks and dispatch results unless debug logging is enabled", async () => {
     const logInfo = vi.fn();
     const runner = createBridgeLoopRunner({
       app: {
@@ -105,6 +105,47 @@ describe("createBridgeLoopRunner", () => {
       },
       now: () => 7000,
       logInfo
+    });
+
+    runner.start();
+    await flushAsyncWork();
+
+    expect(logInfo).toHaveBeenNthCalledWith(
+      1,
+      "bridge inbound chunk received:",
+      expect.objectContaining({
+        bytes: 28
+      })
+    );
+    expect(logInfo).toHaveBeenNthCalledWith(2, "bridge dispatch result:", [
+      { exitCode: 0, handle: "+8613…0000", messageLength: 12 }
+    ]);
+  });
+
+  test("logs raw chunks and dispatch results at debug level", async () => {
+    const logInfo = vi.fn();
+    const runner = createBridgeLoopRunner({
+      app: {
+        processImsgChunk: vi.fn(),
+        dispatchReadyActions: vi.fn(async () => [
+          {
+            handle: "+8613800000000",
+            message: "这是 Codex 的回复",
+            exitCode: 0
+          }
+        ])
+      },
+      watchHost: {
+        start: ({ onChunk }: { onChunk: (chunk: string) => void }) => {
+          onChunk('{"id":"m1","text":"你好"}\n');
+          return {
+            close: vi.fn()
+          };
+        }
+      },
+      now: () => 7000,
+      logInfo,
+      logLevel: "debug"
     });
 
     runner.start();
@@ -243,10 +284,7 @@ describe("createBridgeLoopRunner", () => {
     emitChunk('{"id":"m2"}\n');
     await flushAsyncWork();
 
-    expect(logError).toHaveBeenCalledWith(
-      "bridge dispatch failed:",
-      expect.any(Error)
-    );
+    expect(logError).toHaveBeenCalledWith("bridge dispatch failed:", expect.any(Error));
     expect(dispatchReadyActions).toHaveBeenCalledTimes(2);
   });
 
@@ -281,10 +319,7 @@ describe("createBridgeLoopRunner", () => {
     emitChunk('{"id":"m2"}\n');
     await flushAsyncWork();
 
-    expect(logError).toHaveBeenCalledWith(
-      "bridge dispatch failed:",
-      expect.any(Error)
-    );
+    expect(logError).toHaveBeenCalledWith("bridge dispatch failed:", expect.any(Error));
     expect(dispatchReadyActions).toHaveBeenCalledTimes(2);
   });
 });

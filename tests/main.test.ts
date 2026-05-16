@@ -70,7 +70,8 @@ describe("runMain", () => {
       },
       executablePath: "/opt/homebrew/bin/imsg",
       statePath: expect.stringContaining("data/bridge-state.json"),
-      attachmentDirectory: expect.stringContaining("data/attachments")
+      attachmentDirectory: expect.stringContaining("data/attachments"),
+      logLevel: "info"
     });
     expect(log).toHaveBeenCalledTimes(1);
     expect(log.mock.calls[0]?.[0]).toBe("bridge ready:");
@@ -79,6 +80,7 @@ describe("runMain", () => {
       contactCount: 1,
       statePath: expect.stringContaining("data/bridge-state.json"),
       attachmentDirectory: expect.stringContaining("data/attachments"),
+      logLevel: "info",
       watchArgs: ["watch", "--json", "--attachments"]
     });
     expect(error).not.toHaveBeenCalled();
@@ -125,7 +127,58 @@ describe("runMain", () => {
       contactCount: 2,
       statePath: expect.stringContaining("data/bridge-state.json"),
       attachmentDirectory: expect.stringContaining("data/attachments"),
+      logLevel: "info",
       watchArgs: ["watch", "--json", "--attachments"]
+    });
+  });
+
+  test("uses environment path overrides for config, state, attachments, and log level", async () => {
+    const log = vi.fn();
+    const startBridge = vi.fn(async () => ({
+      close: vi.fn(),
+      watchArgs: ["watch", "--json", "--attachments"]
+    }));
+    const bootstrap = vi.fn(async () => ({
+      status: "ready" as const,
+      executablePath: "/opt/homebrew/bin/imsg",
+      config: {
+        rejectionMessage: "请联系管理员开通权限。",
+        messageMergeWindowMs: 5000,
+        contacts: [
+          {
+            handle: "+8613800000000",
+            name: "测试联系人 A",
+            workspace: "/tmp/workspace-a"
+          }
+        ]
+      }
+    }));
+
+    const exitCode = await runMain({
+      bootstrap,
+      startBridge,
+      log,
+      error: vi.fn(),
+      env: {
+        BRIDGE_CONFIG_PATH: "/tmp/custom-bridge.yaml",
+        BRIDGE_STATE_PATH: "/tmp/custom-state.json",
+        BRIDGE_ATTACHMENT_DIR: "/tmp/custom-attachments",
+        BRIDGE_LOG_LEVEL: "debug"
+      }
+    });
+
+    expect(exitCode).toBe(0);
+    expect(startBridge).toHaveBeenCalledWith({
+      config: expect.any(Object),
+      executablePath: "/opt/homebrew/bin/imsg",
+      statePath: "/tmp/custom-state.json",
+      attachmentDirectory: "/tmp/custom-attachments",
+      logLevel: "debug"
+    });
+    expect(JSON.parse(String(log.mock.calls[0]?.[1]))).toMatchObject({
+      statePath: "/tmp/custom-state.json",
+      attachmentDirectory: "/tmp/custom-attachments",
+      logLevel: "debug"
     });
   });
 });

@@ -6,9 +6,10 @@ import { createBridgeRuntime } from "./bridge-runtime.js";
 type CreateBridgeAppOptions = {
   contactsProvider?: () => BridgeConfig["contacts"];
   adminHandles?: string[];
-  executeRuntimeActions?: (actions: ReturnType<
-    ReturnType<typeof createBridgeRuntime>["drainActions"]
-  >, now: number) => Promise<BridgeExecutionAction[]>;
+  executeRuntimeActions?: (
+    actions: ReturnType<ReturnType<typeof createBridgeRuntime>["drainActions"]>,
+    now: number
+  ) => Promise<BridgeExecutionAction[]>;
   pollExecutionActions?: (now: number) => Promise<BridgeExecutionAction[]>;
   dispatchExecutionActions?: (
     actions: BridgeExecutionAction[]

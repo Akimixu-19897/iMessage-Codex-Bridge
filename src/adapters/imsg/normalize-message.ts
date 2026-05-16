@@ -48,9 +48,8 @@ export function normalizeImsgMessage(
   const senderName =
     typeof rawMessage.sender === "string"
       ? null
-      : rawMessage.sender.displayName ?? rawMessage.sender.display_name ?? null;
-  const receivedAt =
-    rawMessage.timestamp ?? normalizeCreatedAt(rawMessage.created_at);
+      : (rawMessage.sender.displayName ?? rawMessage.sender.display_name ?? null);
+  const receivedAt = rawMessage.timestamp ?? normalizeCreatedAt(rawMessage.created_at);
 
   return {
     messageId: normalizeRequiredString(messageId),

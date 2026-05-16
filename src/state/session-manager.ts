@@ -53,7 +53,10 @@ export function createSessionManager(state: BridgeState) {
       );
     },
 
-    ensureCurrentSession(handle: string, activatedAt: number): ResolvedConversationSession {
+    ensureCurrentSession(
+      handle: string,
+      activatedAt: number
+    ): ResolvedConversationSession {
       const existingSession = this.getCurrentSession(handle);
 
       if (existingSession) {
@@ -71,11 +74,7 @@ export function createSessionManager(state: BridgeState) {
       return [...getContactOrThrow(handle).sessions];
     },
 
-    createSession(params: {
-      handle: string;
-      name?: string;
-      createdAt: number;
-    }): {
+    createSession(params: { handle: string; name?: string; createdAt: number }): {
       handle: string;
       workspace: string;
       session: ResolvedConversationSession;

@@ -1,7 +1,4 @@
-import type {
-  BridgeAdminCommand,
-  ParsedBridgeAdminCommand
-} from "./admin-command.js";
+import type { BridgeAdminCommand, ParsedBridgeAdminCommand } from "./admin-command.js";
 import {
   ensureContactWorkspace,
   getDefaultWorkspaceRoot,
@@ -29,11 +26,7 @@ type SessionManager = {
       threadId: string | null;
     }>;
   }>;
-  upsertContact(params: {
-    handle: string;
-    name: string;
-    workspace: string;
-  }): {
+  upsertContact(params: { handle: string; name: string; workspace: string }): {
     handle: string;
     name: string;
     workspace: string;
@@ -42,10 +35,7 @@ type SessionManager = {
     handle: string;
     name: string;
   };
-  updateWorkspace(params: {
-    handle: string;
-    workspace: string;
-  }): {
+  updateWorkspace(params: { handle: string; workspace: string }): {
     currentSessionId: string | null;
   };
 };
@@ -57,9 +47,7 @@ type CreateAdminCommandExecutorOptions = {
   resolveWorkspaceForHandle?: (handle: string) => string;
 };
 
-export function createAdminCommandExecutor(
-  options: CreateAdminCommandExecutorOptions
-) {
+export function createAdminCommandExecutor(options: CreateAdminCommandExecutorOptions) {
   const ensureWorkspaceDirectory =
     options.ensureWorkspaceDirectory ?? ensureContactWorkspace;
   const resolveWorkspaceForHandle =
@@ -75,13 +63,7 @@ export function createAdminCommandExecutor(
       }
 
       if (command.type === "help") {
-        return [
-          "支持命令：",
-          "/bridge list",
-          `/bridge allow <handle> <name> [workspace]（默认：${getDefaultWorkspaceRoot()}/<handle>）`,
-          "/bridge workspace <handle> <workspace>",
-          "/bridge remove <handle>"
-        ].join("\n");
+        return formatAdminHelp();
       }
 
       if (command.type === "list") {
@@ -96,6 +78,33 @@ export function createAdminCommandExecutor(
       });
     }
   };
+}
+
+function formatAdminHelp(): string {
+  return [
+    "Bridge 管理命令：",
+    "",
+    "1. /bridge list",
+    "查看当前白名单联系人、workspace 和会话数量。",
+    "",
+    "2. /bridge allow <handle> <name> [workspace]",
+    "添加或更新一个联系人。handle 是手机号或 iMessage 邮箱；name 是备注名；workspace 是这个联系人默认操作目录。",
+    `不传 workspace 时，会自动使用默认目录：${getDefaultWorkspaceRoot()}/<handle>`,
+    '示例：/bridge allow "user@example.com" "张三" "/Users/akimixu/project-a"',
+    "",
+    "3. /bridge workspace <handle> <workspace>",
+    "修改某个联系人的默认 workspace。已有当前会话会在下一条消息时用新目录重新开线程。",
+    '示例：/bridge workspace "user@example.com" "/Users/akimixu/project-b"',
+    "",
+    "4. /bridge workspace",
+    "把你自己的 workspace 恢复成默认目录，适合管理员把自己从临时项目切回来。",
+    "",
+    "5. /bridge remove <handle>",
+    "从白名单移除联系人。移除后该联系人不能再使用 Codex bridge。",
+    '示例：/bridge remove "user@example.com"',
+    "",
+    "提示：参数里有空格时请用英文引号包起来。"
+  ].join("\n");
 }
 
 async function executeStatefulCommand(

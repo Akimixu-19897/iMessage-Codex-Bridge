@@ -1,12 +1,6 @@
-import type {
-  ResolvedContactSession,
-  ResolvedConversationSession
-} from "../../state/session-manager.js";
+import type { ResolvedConversationSession } from "../../state/session-manager.js";
 
-import type {
-  CodexAppServerClient,
-  CodexThread
-} from "./app-server-client.js";
+import type { CodexAppServerClient, CodexThread } from "./app-server-client.js";
 
 type SessionManager = {
   ensureCurrentSession(
@@ -29,10 +23,7 @@ type SessionManager = {
 type CreateThreadServiceOptions = {
   appServerClient: CodexAppServerClient;
   sessionManager: SessionManager;
-  resolveThreadPolicy?: (params: {
-    handle: string;
-    workspace: string;
-  }) => {
+  resolveThreadPolicy?: (params: { handle: string; workspace: string }) => {
     approvalPolicy: "untrusted" | "on-failure" | "on-request" | "never";
     sandbox: "read-only" | "workspace-write" | "danger-full-access";
     developerInstructions: string;

@@ -29,10 +29,7 @@ function createFakeChildProcess() {
   };
 }
 
-async function waitForCondition(
-  condition: () => void,
-  attempts = 20
-): Promise<void> {
+async function waitForCondition(condition: () => void, attempts = 20): Promise<void> {
   let lastError: unknown;
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
@@ -87,14 +84,12 @@ describe("createAppServerStdioHost", () => {
             optOutNotificationMethods: []
           }
         }
-      })}\n`,
+      })}\n`
     ]);
 
     fakeChild.stdout.emit(
       "data",
-      Buffer.from(
-        '{"id":1,"result":{"userAgent":"imessage-codex-bridge/0.1.0"}}\n'
-      )
+      Buffer.from('{"id":1,"result":{"userAgent":"imessage-codex-bridge/0.1.0"}}\n')
     );
     await waitForCondition(() => {
       expect(fakeChild.stdinWrites).toHaveLength(3);
@@ -176,9 +171,7 @@ describe("createAppServerStdioHost", () => {
     const session = host.start();
     fakeChild.stdout.emit(
       "data",
-      Buffer.from(
-        '{"id":1,"result":{"userAgent":"imessage-codex-bridge/0.1.0"}}\n'
-      )
+      Buffer.from('{"id":1,"result":{"userAgent":"imessage-codex-bridge/0.1.0"}}\n')
     );
     await Promise.resolve();
     fakeChild.stdout.emit(

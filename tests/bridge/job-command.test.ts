@@ -1,9 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import {
-  isLongTaskText,
-  parseBridgeJobCommand
-} from "../../src/bridge/job-command.js";
+import { isLongTaskText, parseBridgeJobCommand } from "../../src/bridge/job-command.js";
 
 describe("parseBridgeJobCommand", () => {
   test("parses task and list commands", () => {

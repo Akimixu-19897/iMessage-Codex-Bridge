@@ -203,9 +203,7 @@ describe("createTurnResponseCollector", () => {
       threadId: "thread-1",
       turnId: "turn-1"
     });
-    const replayTimeout = vi
-      .advanceTimersByTimeAsync(20)
-      .then(() => "timeout");
+    const replayTimeout = vi.advanceTimersByTimeAsync(20).then(() => "timeout");
 
     await expect(Promise.race([replayedPromise, replayTimeout])).resolves.toBe(
       "timeout"

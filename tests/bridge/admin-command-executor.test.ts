@@ -17,6 +17,33 @@ const TEST_CONFIG = {
 };
 
 describe("createAdminCommandExecutor", () => {
+  test("explains admin commands with purpose, parameters, and examples", async () => {
+    const executor = createAdminCommandExecutor({
+      sessionManager: createSessionManager(createInitialBridgeState(TEST_CONFIG)),
+      saveState: async () => {}
+    });
+
+    await expect(
+      executor.execute({
+        type: "help"
+      })
+    ).resolves.toContain("查看当前白名单联系人、workspace 和会话数量");
+
+    await expect(
+      executor.execute({
+        type: "help"
+      })
+    ).resolves.toContain(
+      '/bridge allow "user@example.com" "张三" "/Users/akimixu/project-a"'
+    );
+
+    await expect(
+      executor.execute({
+        type: "help"
+      })
+    ).resolves.toContain("不传 workspace 时，会自动使用默认目录");
+  });
+
   test("adds contacts, lists contacts, updates workspace, and removes contacts", async () => {
     const state = createInitialBridgeState(TEST_CONFIG);
     const sessionManager = createSessionManager(state);
@@ -32,9 +59,7 @@ describe("createAdminCommandExecutor", () => {
         name: "联系人 B",
         workspace: "/tmp/workspace-b"
       })
-    ).resolves.toBe(
-      "已保存联系人：+8613900000000 | 联系人 B | /tmp/workspace-b"
-    );
+    ).resolves.toBe("已保存联系人：+8613900000000 | 联系人 B | /tmp/workspace-b");
 
     await expect(
       executor.execute({
@@ -48,9 +73,7 @@ describe("createAdminCommandExecutor", () => {
         handle: "+8613900000000",
         workspace: "/tmp/new-workspace"
       })
-    ).resolves.toBe(
-      "已更新 workspace：+8613900000000 -> /tmp/new-workspace"
-    );
+    ).resolves.toBe("已更新 workspace：+8613900000000 -> /tmp/new-workspace");
 
     await expect(
       executor.execute({
@@ -59,9 +82,7 @@ describe("createAdminCommandExecutor", () => {
       })
     ).resolves.toBe("已移除联系人：+8613900000000");
 
-    expect(state.contacts.map((contact) => contact.handle)).toEqual([
-      "+8613800000000"
-    ]);
+    expect(state.contacts.map((contact) => contact.handle)).toEqual(["+8613800000000"]);
   });
 
   test("creates a per-contact default workspace when allow omits workspace", async () => {
@@ -74,7 +95,11 @@ describe("createAdminCommandExecutor", () => {
       ensureWorkspaceDirectory: async (path) => {
         ensuredPaths.push(path);
       },
-      resolveWorkspaceForHandle: (handle) => `/Users/test/.imessage-codex-agent/workspace/${handle.toLowerCase().replace(/[^a-z0-9._-]+/g, "_").replace(/^_+|_+$/g, "")}`
+      resolveWorkspaceForHandle: (handle) =>
+        `/Users/test/.imessage-codex-agent/workspace/${handle
+          .toLowerCase()
+          .replace(/[^a-z0-9._-]+/g, "_")
+          .replace(/^_+|_+$/g, "")}`
     });
 
     await expect(
@@ -149,9 +174,7 @@ describe("createAdminCommandExecutor", () => {
         handle: "+8613800000000",
         workspace: "/tmp/new-explicit-workspace"
       })
-    ).resolves.toBe(
-      "已更新 workspace：+8613800000000 -> /tmp/new-explicit-workspace"
-    );
+    ).resolves.toBe("已更新 workspace：+8613800000000 -> /tmp/new-explicit-workspace");
 
     expect(ensuredPaths).toEqual(["/tmp/new-explicit-workspace"]);
   });

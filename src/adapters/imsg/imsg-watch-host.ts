@@ -27,10 +27,7 @@ export function createImsgWatchHost(options: CreateImsgWatchHostOptions) {
 
   return {
     start(sessionOptions: StartImsgWatchSessionOptions) {
-      const childProcess = spawnProcess(
-        options.executablePath,
-        options.watchArgs
-      );
+      const childProcess = spawnProcess(options.executablePath, options.watchArgs);
 
       childProcess.stdout.on("data", (chunk: Buffer | string) => {
         sessionOptions.onChunk(chunk.toString());

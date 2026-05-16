@@ -1,4 +1,5 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { mkdir, open, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import { z } from "zod";
@@ -68,6 +69,7 @@ const backgroundJobStateSchema = z.object({
     "cancelled"
   ]),
   createdAt: z.number().int().nonnegative(),
+  acknowledgedAt: z.number().int().nonnegative().nullable().default(null),
   updatedAt: z.number().int().nonnegative(),
   startedAt: z.number().int().nonnegative().nullable(),
   finishedAt: z.number().int().nonnegative().nullable(),
@@ -172,13 +174,15 @@ function parseBridgeState(parsedJson: unknown): BridgeState {
     return parsedV3.data;
   }
 
-  const parsedV2Schema = z.object({
-    version: z.literal(2),
-    contacts: z.array(contactSessionStateSchema),
-    processedMessages: z.array(processedMessageStateSchema),
-    outboundMessages: z.array(outboundMessageStateSchema),
-    attachments: z.array(attachmentRecordStateSchema)
-  }).safeParse(parsedJson);
+  const parsedV2Schema = z
+    .object({
+      version: z.literal(2),
+      contacts: z.array(contactSessionStateSchema),
+      processedMessages: z.array(processedMessageStateSchema),
+      outboundMessages: z.array(outboundMessageStateSchema),
+      attachments: z.array(attachmentRecordStateSchema)
+    })
+    .safeParse(parsedJson);
 
   if (parsedV2Schema.success) {
     return {
@@ -228,9 +232,7 @@ type SaveBridgeStateOptions = {
   state: BridgeState;
 };
 
-export async function saveBridgeState(
-  options: SaveBridgeStateOptions
-): Promise<void> {
+export async function saveBridgeState(options: SaveBridgeStateOptions): Promise<void> {
   const serializedState = JSON.stringify(
     bridgeStateSchema.parse(options.state),
     null,
@@ -238,7 +240,22 @@ export async function saveBridgeState(
   );
 
   await mkdir(dirname(options.path), { recursive: true });
-  await writeFile(options.path, `${serializedState}\n`, "utf8");
+  await writeFileAtomically(options.path, `${serializedState}\n`);
+}
+
+async function writeFileAtomically(path: string, content: string): Promise<void> {
+  const temporaryPath = `${path}.${process.pid}.${randomUUID()}.tmp`;
+
+  await writeFile(temporaryPath, content, "utf8");
+
+  const fileHandle = await open(temporaryPath, "r");
+  try {
+    await fileHandle.sync();
+  } finally {
+    await fileHandle.close();
+  }
+
+  await rename(temporaryPath, path);
 }
 
 function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {

@@ -430,10 +430,7 @@ describe("createBridgeCodexExecutor", () => {
           status: "inProgress"
         }
       })),
-      waitForTurn: vi.fn(
-        () =>
-          new Promise<{ text: string; status: string }>(() => {})
-      ),
+      waitForTurn: vi.fn(() => new Promise<{ text: string; status: string }>(() => {})),
       interruptTurn,
       cancelWaitForTurn,
       turnTimeoutMs: {
@@ -503,9 +500,7 @@ describe("createBridgeCodexExecutor", () => {
           status: "inProgress"
         }
       })),
-      waitForTurn: vi.fn(
-        () => new Promise<{ text: string; status: string }>(() => {})
-      ),
+      waitForTurn: vi.fn(() => new Promise<{ text: string; status: string }>(() => {})),
       cancelWaitForTurn,
       interruptTurn
     });
@@ -579,5 +574,4 @@ describe("createBridgeCodexExecutor", () => {
       turnId: "turn-1"
     });
   });
-
 });

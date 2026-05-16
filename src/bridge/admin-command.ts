@@ -29,13 +29,9 @@ export type InvalidBridgeAdminCommand = {
   message: string;
 };
 
-export type ParsedBridgeAdminCommand =
-  | BridgeAdminCommand
-  | InvalidBridgeAdminCommand;
+export type ParsedBridgeAdminCommand = BridgeAdminCommand | InvalidBridgeAdminCommand;
 
-export function parseBridgeAdminCommand(
-  text: string
-): ParsedBridgeAdminCommand | null {
+export function parseBridgeAdminCommand(text: string): ParsedBridgeAdminCommand | null {
   const tokens = tokenizeCommand(text);
 
   if (tokens.length === 0 || tokens[0] !== "/bridge") {
@@ -76,8 +72,7 @@ export function parseBridgeAdminCommand(
       if (tokens.length !== 4) {
         return {
           type: "invalid",
-          message:
-            "workspace 命令格式：/bridge workspace <handle> <workspace>"
+          message: "workspace 命令格式：/bridge workspace <handle> <workspace>"
         };
       }
 

@@ -35,6 +35,11 @@ type JobManager = {
   listJobs(handle: string): BackgroundJobState[];
   getJob(handle: string, jobId: string): BackgroundJobState;
   recoverInterruptedJobs?(now: number): Promise<void>;
+  markAcknowledged(params: {
+    handle: string;
+    jobId: string;
+    now: number;
+  }): Promise<BackgroundJobState>;
   markRunning(params: {
     handle: string;
     jobId: string;
@@ -99,14 +104,8 @@ type CreateBridgeCodexExecutorOptions = {
     text: string;
     status: string;
   }>;
-  cancelWaitForTurn?: (params: {
-    threadId: string;
-    turnId: string;
-  }) => void;
-  interruptTurn?: (params: {
-    threadId: string;
-    turnId: string;
-  }) => Promise<void>;
+  cancelWaitForTurn?: (params: { threadId: string; turnId: string }) => void;
+  interruptTurn?: (params: { threadId: string; turnId: string }) => Promise<void>;
   executeAdminCommand?: (params: {
     handle: string;
     command: CommandAction["command"];
@@ -125,9 +124,7 @@ type CreateBridgeCodexExecutorOptions = {
   };
 };
 
-export function createBridgeCodexExecutor(
-  options: CreateBridgeCodexExecutorOptions
-) {
+export function createBridgeCodexExecutor(options: CreateBridgeCodexExecutorOptions) {
   const activeJobIds = new Set<string>();
   const turnTimeoutMs = {
     foreground: options.turnTimeoutMs?.foreground ?? 10 * 60_000,
@@ -203,8 +200,8 @@ export function createBridgeCodexExecutor(
           job.workflow === "autoresearch"
             ? turnTimeoutMs.autoresearch
             : job.mode === "foreground"
-            ? turnTimeoutMs.foreground
-            : turnTimeoutMs.background,
+              ? turnTimeoutMs.foreground
+              : turnTimeoutMs.background,
         onTimeout: async () => {
           options.cancelWaitForTurn?.({
             threadId: submittedTurn.threadId,
@@ -266,7 +263,7 @@ export function createBridgeCodexExecutor(
       const message =
         error instanceof Error
           ? error.message
-          : options.codexUnavailableMessage ?? "抱歉，Codex 暂时不可用，请稍后再试。";
+          : (options.codexUnavailableMessage ?? "抱歉，Codex 暂时不可用，请稍后再试。");
 
       await options.jobManager.markFailed({
         handle: job.handle,
@@ -609,6 +606,14 @@ async function executeSubmitAction(
 
   void startJob(job, now);
 
+  if (!action.batch.background) {
+    await options.jobManager.markAcknowledged({
+      handle: action.batch.handle,
+      jobId: job.id,
+      now
+    });
+  }
+
   return {
     type: "reply",
     handle: action.batch.handle,
@@ -620,10 +625,7 @@ async function executeSubmitAction(
   };
 }
 
-function formatJobCommandError(
-  handle: string,
-  error: unknown
-): BridgeReplyAction {
+function formatJobCommandError(handle: string, error: unknown): BridgeReplyAction {
   return {
     type: "reply",
     handle,

@@ -41,10 +41,7 @@ class TurnCancelledError extends Error {
 export function createTurnResponseCollector() {
   const pendingTurns = new Map<string, PendingTurn>();
   const cancelledTurns = new Set<string>();
-  const cancelledTurnCleanupTimers = new Map<
-    string,
-    ReturnType<typeof setTimeout>
-  >();
+  const cancelledTurnCleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   function clearCancelledTurn(turnId: string): void {
     const cleanupTimer = cancelledTurnCleanupTimers.get(turnId);
@@ -118,10 +115,7 @@ export function createTurnResponseCollector() {
       pendingTurn?.reject?.(new TurnCancelledError(turnId));
     },
 
-    handleNotification(notification: {
-      method: string;
-      params?: unknown;
-    }): void {
+    handleNotification(notification: { method: string; params?: unknown }): void {
       if (notification.method === "item/agentMessage/delta") {
         const params = notification.params as AgentMessageDeltaNotification;
 

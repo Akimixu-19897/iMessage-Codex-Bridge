@@ -30,9 +30,7 @@ export type InvalidBridgeJobCommand = {
 
 export type ParsedBridgeJobCommand = BridgeJobCommand | InvalidBridgeJobCommand;
 
-export function parseBridgeJobCommand(
-  text: string
-): ParsedBridgeJobCommand | null {
+export function parseBridgeJobCommand(text: string): ParsedBridgeJobCommand | null {
   const trimmed = text.trim();
 
   if (!trimmed) {
@@ -169,7 +167,6 @@ export function usesAutoresearchWorkflow(text: string | null | undefined): boole
   const normalized = text.trim().toLowerCase();
 
   return (
-    normalized.includes("codex-autoresearch") ||
-    normalized.startsWith("/research ")
+    normalized.includes("codex-autoresearch") || normalized.startsWith("/research ")
   );
 }

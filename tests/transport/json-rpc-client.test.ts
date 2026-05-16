@@ -63,9 +63,7 @@ describe("createJsonRpcClient", () => {
       })
     );
 
-    await expect(responsePromise).rejects.toThrow(
-      "JSON-RPC -32000: thread not found"
-    );
+    await expect(responsePromise).rejects.toThrow("JSON-RPC -32000: thread not found");
   });
 
   test("ignores unmatched inbound messages until the correct response arrives", async () => {

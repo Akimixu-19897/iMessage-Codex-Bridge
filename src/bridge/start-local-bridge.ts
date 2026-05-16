@@ -2,10 +2,7 @@ import { createAppServerStdioHost } from "../adapters/codex/app-server-stdio-hos
 import { createImsgClient } from "../adapters/imsg/imsg-client.js";
 import { createImsgWatchHost } from "../adapters/imsg/imsg-watch-host.js";
 import type { BridgeConfig } from "../config/schema.js";
-import {
-  loadBridgeState,
-  type BridgeState
-} from "../state/state-store.js";
+import { loadBridgeState, type BridgeState } from "../state/state-store.js";
 import { createBridgeLoopRunner } from "./bridge-loop-runner.js";
 import { ensureContactWorkspace } from "./contact-workspace.js";
 import { createLocalBridgeRuntime } from "./local-bridge-runtime.js";
@@ -38,6 +35,7 @@ type StartLocalBridgeOptions = {
   executablePath: string;
   statePath: string;
   attachmentDirectory?: string;
+  logLevel?: "silent" | "info" | "debug";
   ensureWorkspaceDirectory?: (path: string) => Promise<void>;
   loadBridgeState?: (options: {
     path: string;
@@ -65,11 +63,9 @@ type StartLocalBridgeOptions = {
   createBridgeLoopRunner?: (options: {
     app: LocalBridgeRuntime["app"];
     watchHost: WatchHost;
+    logLevel?: "silent" | "info" | "debug";
   }) => LoopRunner;
-  sendTextMessage?: (params: {
-    to: string;
-    text: string;
-  }) => Promise<{
+  sendTextMessage?: (params: { to: string; text: string }) => Promise<{
     exitCode: number;
     stdout: string;
     stderr: string;
@@ -133,11 +129,11 @@ export async function startLocalBridge(options: StartLocalBridgeOptions) {
     executablePath: options.executablePath,
     watchArgs: localRuntime.app.watchArgs
   });
-  const createLoopRunner =
-    options.createBridgeLoopRunner ?? createBridgeLoopRunner;
+  const createLoopRunner = options.createBridgeLoopRunner ?? createBridgeLoopRunner;
   const loopRunner = createLoopRunner({
     app: localRuntime.app,
-    watchHost
+    watchHost,
+    logLevel: options.logLevel
   });
   const loopSession = loopRunner.start();
 

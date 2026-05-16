@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -130,7 +130,12 @@ describe("state-store", () => {
       })
     ).resolves.toEqual(state);
 
-    await expect(readFile(statePath, "utf8")).resolves.toContain('"currentSessionId": "session-1"');
+    await expect(readFile(statePath, "utf8")).resolves.toContain(
+      '"currentSessionId": "session-1"'
+    );
+    await expect(readdir(join(tempDirectory, "state"))).resolves.not.toContain(
+      "bridge-state.json.tmp"
+    );
   });
 
   test("migrates legacy version 1 state into version 3 sessions", async () => {

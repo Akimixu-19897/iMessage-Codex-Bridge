@@ -22,6 +22,8 @@ type CreateJobParams = {
   now: number;
 };
 
+const FOREGROUND_SLOW_NOTICE_AFTER_MS = 25_000;
+
 export function createJobManager(options: CreateJobManagerOptions) {
   const pendingNotifications: JobNotification[] = [];
 
@@ -57,7 +59,13 @@ export function createJobManager(options: CreateJobManagerOptions) {
   }
 
   function formatElapsed(now: number, startedAt: number): string {
-    const totalMinutes = Math.max(1, Math.floor((now - startedAt) / 60_000));
+    const totalSeconds = Math.max(1, Math.floor((now - startedAt) / 1000));
+
+    if (totalSeconds < 60) {
+      return `${totalSeconds} 秒`;
+    }
+
+    const totalMinutes = Math.floor(totalSeconds / 60);
 
     if (totalMinutes < 60) {
       return `${totalMinutes} 分钟`;
@@ -107,6 +115,7 @@ export function createJobManager(options: CreateJobManagerOptions) {
         attachmentPaths: params.attachmentPaths,
         status: "queued",
         createdAt: params.now,
+        acknowledgedAt: null,
         updatedAt: params.now,
         startedAt: null,
         finishedAt: null,
@@ -186,6 +195,18 @@ export function createJobManager(options: CreateJobManagerOptions) {
 
     getJob(handle: string, jobId: string): BackgroundJobState {
       return findJob(handle, jobId);
+    },
+
+    async markAcknowledged(params: {
+      handle: string;
+      jobId: string;
+      now: number;
+    }): Promise<BackgroundJobState> {
+      const job = findJob(params.handle, params.jobId);
+      job.acknowledgedAt = params.now;
+      job.updatedAt = params.now;
+      await options.saveState();
+      return job;
     },
 
     async markRunning(params: {
@@ -341,17 +362,19 @@ export function createJobManager(options: CreateJobManagerOptions) {
         if (
           job.mode === "foreground" &&
           job.slowNoticeSentAt === null &&
-          now - job.createdAt >= 5_000
+          now - (job.acknowledgedAt ?? job.createdAt) >= FOREGROUND_SLOW_NOTICE_AFTER_MS
         ) {
+          const acknowledgedAt = job.acknowledgedAt ?? job.createdAt;
+          const elapsed = formatElapsed(now, acknowledgedAt);
           job.slowNoticeSentAt = now;
           job.updatedAt = now;
           job.logs.push({
             at: now,
-            message: "还在处理中，请稍等"
+            message: `已执行 ${elapsed}，还在处理中，请稍等`
           });
           enqueueNotification({
             handle: job.handle,
-            message: `任务 #${job.id} 还在处理中，请稍等`
+            message: `任务 #${job.id} 已执行 ${elapsed}，还在处理中，请稍等`
           });
           dirty = true;
         }

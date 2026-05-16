@@ -50,7 +50,9 @@ describe("createImsgJsonStreamParser", () => {
       }
     });
 
-    parser.pushChunk('\n{"id":"m1","chatId":"c1","sender":{"handle":"+8613800000000"},"text":"唯一消息","timestamp":1,"attachments":[]}\n\n');
+    parser.pushChunk(
+      '\n{"id":"m1","chatId":"c1","sender":{"handle":"+8613800000000"},"text":"唯一消息","timestamp":1,"attachments":[]}\n\n'
+    );
 
     expect(messages).toEqual([
       {

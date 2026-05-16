@@ -57,16 +57,22 @@ export function createBridgeRuntime(
       const result = bridgeService.handleIncomingMessage(message);
 
       if (result.type === "session_command") {
-        const flushedBatches = bridgeService.flushHandle(result.handle).map((batch) => ({
-          type: "submit" as const,
-          batch
-        }));
+        const flushedBatches = bridgeService
+          .flushHandle(result.handle)
+          .map((batch) => ({
+            type: "submit" as const,
+            batch
+          }));
 
         pendingActions.push(...flushedBatches, result);
         return;
       }
 
-      if (result.type === "reject" || result.type === "command" || result.type === "job_command") {
+      if (
+        result.type === "reject" ||
+        result.type === "command" ||
+        result.type === "job_command"
+      ) {
         pendingActions.push(result);
       }
     }

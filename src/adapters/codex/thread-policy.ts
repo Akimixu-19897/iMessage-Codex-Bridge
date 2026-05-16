@@ -10,9 +10,7 @@ type ThreadPolicy = {
   developerInstructions: string;
 };
 
-export function resolveThreadPolicy(
-  params: ResolveThreadPolicyParams
-): ThreadPolicy {
+export function resolveThreadPolicy(params: ResolveThreadPolicyParams): ThreadPolicy {
   if (isAdminHandle(params.handle, params.adminHandles)) {
     return {
       approvalPolicy: "never",
@@ -39,7 +37,9 @@ export function resolveThreadPolicy(
 }
 
 function isAdminHandle(handle: string, adminHandles: string[]): boolean {
-  return adminHandles.some((adminHandle) => normalizeHandle(adminHandle) === normalizeHandle(handle));
+  return adminHandles.some(
+    (adminHandle) => normalizeHandle(adminHandle) === normalizeHandle(handle)
+  );
 }
 
 function normalizeHandle(handle: string): string {

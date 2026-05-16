@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.akimixu.imessage-codex-bridge</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/akimixu/Desktop/Projects/imessage-codex-bridge/scripts/run-production.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/akimixu/Desktop/Projects/imessage-codex-bridge</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/akimixu/.volta/bin:/Applications/Codex.app/Contents/Resources</string>
+    <key>BRIDGE_CONFIG_PATH</key>
+    <string>/Users/akimixu/Desktop/Projects/imessage-codex-bridge/config/bridge.local.yaml</string>
+    <key>BRIDGE_STATE_PATH</key>
+    <string>/Users/akimixu/Desktop/Projects/imessage-codex-bridge/data/bridge-state.json</string>
+    <key>BRIDGE_ATTACHMENT_DIR</key>
+    <string>/Users/akimixu/Desktop/Projects/imessage-codex-bridge/data/attachments</string>
+    <key>BRIDGE_LOG_LEVEL</key>
+    <string>info</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/akimixu/Desktop/Projects/imessage-codex-bridge/logs/bridge.out.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/akimixu/Desktop/Projects/imessage-codex-bridge/logs/bridge.err.log</string>
+
+  <key>ProcessType</key>
+  <string>Interactive</string>
+
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+</dict>
+</plist>

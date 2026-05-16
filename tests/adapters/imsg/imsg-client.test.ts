@@ -86,15 +86,7 @@ describe("createImsgClient", () => {
     });
 
     expect(calls).toEqual([
-      [
-        "imsg",
-        "send",
-        "--to",
-        "+8613800000000",
-        "--text",
-        "你好",
-        "--json"
-      ]
+      ["imsg", "send", "--to", "+8613800000000", "--text", "你好", "--json"]
     ]);
     expect(result).toEqual({
       exitCode: 0,

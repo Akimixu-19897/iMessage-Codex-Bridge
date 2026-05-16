@@ -28,22 +28,16 @@ type CreateLocalBridgeRuntimeOptions = {
   appServerSession: AppServerSession;
   attachmentDirectory?: string;
   logError?: (...args: unknown[]) => void;
-  sendTextMessage: (params: {
-    to: string;
-    text: string;
-  }) => Promise<{
+  sendTextMessage: (params: { to: string; text: string }) => Promise<{
     exitCode: number;
     stdout: string;
     stderr: string;
   }>;
 };
 
-export function createLocalBridgeRuntime(
-  options: CreateLocalBridgeRuntimeOptions
-) {
+export function createLocalBridgeRuntime(options: CreateLocalBridgeRuntimeOptions) {
   const attachmentDirectory =
-    options.attachmentDirectory ??
-    join(dirname(options.statePath), "attachments");
+    options.attachmentDirectory ?? join(dirname(options.statePath), "attachments");
   const logError = options.logError ?? console.error;
   const turnResponseCollector = createTurnResponseCollector();
   const sessionManager = createSessionManager(options.state);
@@ -71,10 +65,7 @@ export function createLocalBridgeRuntime(
   void jobManager.recoverInterruptedJobs?.(Date.now());
   const appServerClient = createCodexAppServerClient({
     invokeRequest: (request) =>
-      options.appServerSession.request(
-        request.method,
-        request.params
-      ) as Promise<any>
+      options.appServerSession.request(request.method, request.params) as Promise<any>
   });
   const threadService = createThreadService({
     appServerClient,
@@ -171,8 +162,7 @@ export function createLocalBridgeRuntime(
   const app = createBridgeApp(options.config, {
     contactsProvider: () => options.state.contacts,
     adminHandles: options.config.adminHandles,
-    executeRuntimeActions: (actions, now) =>
-      bridgeCodexExecutor.execute(actions, now),
+    executeRuntimeActions: (actions, now) => bridgeCodexExecutor.execute(actions, now),
     pollExecutionActions: (now) => bridgeCodexExecutor.poll(now),
     dispatchExecutionActions: (actions) => bridgeOutboundDispatcher.dispatch(actions)
   });
@@ -180,10 +170,7 @@ export function createLocalBridgeRuntime(
   return {
     app,
 
-    handleCodexNotification(notification: {
-      method: string;
-      params?: unknown;
-    }): void {
+    handleCodexNotification(notification: { method: string; params?: unknown }): void {
       turnResponseCollector.handleNotification(notification);
     }
   };

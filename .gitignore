@@ -5,4 +5,5 @@ coverage/
 config/bridge.local.yaml
 data/state/
 data/attachments/
+logs/
 .DS_Store

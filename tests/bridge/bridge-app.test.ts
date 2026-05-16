@@ -18,11 +18,7 @@ describe("createBridgeApp", () => {
       ]
     });
 
-    expect(app.watchArgs).toEqual([
-      "watch",
-      "--json",
-      "--attachments"
-    ]);
+    expect(app.watchArgs).toEqual(["watch", "--json", "--attachments"]);
   });
 
   test("processes imsg chunks and drains runtime actions", () => {
@@ -198,19 +194,19 @@ describe("createBridgeApp", () => {
             }
           : action.type === "submit"
             ? {
-              type: "reply" as const,
-              handle: action.batch.handle,
-              message: "unexpected",
-              threadId: "unexpected",
-              turnId: "unexpected"
-            }
+                type: "reply" as const,
+                handle: action.batch.handle,
+                message: "unexpected",
+                threadId: "unexpected",
+                turnId: "unexpected"
+              }
             : {
-              type: "reply" as const,
-              handle: action.handle,
-              message: "unexpected",
-              threadId: "unexpected",
-              turnId: "unexpected"
-            }
+                type: "reply" as const,
+                handle: action.handle,
+                message: "unexpected",
+                threadId: "unexpected",
+                turnId: "unexpected"
+              }
       );
     const app = createBridgeApp(
       {

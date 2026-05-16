@@ -55,7 +55,7 @@ describe("createImsgWatchHost", () => {
     const host = createImsgWatchHost({
       executablePath: "/opt/homebrew/bin/imsg",
       watchArgs: ["watch", "--json"],
-      spawnProcess: () => fakeChild.process,
+      spawnProcess: () => fakeChild.process
     });
 
     const session = host.start({ onChunk: () => {} });

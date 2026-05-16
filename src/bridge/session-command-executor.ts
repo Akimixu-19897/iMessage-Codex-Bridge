@@ -1,11 +1,7 @@
 import type { ParsedBridgeSessionCommand } from "./session-command.js";
 
 type SessionManager = {
-  createSession(params: {
-    handle: string;
-    name?: string;
-    createdAt: number;
-  }): {
+  createSession(params: { handle: string; name?: string; createdAt: number }): {
     handle: string;
     workspace: string;
     session: {
@@ -28,7 +24,10 @@ type SessionManager = {
     workspace: string;
     threadId: string | null;
   } | null;
-  switchSession(handle: string, index: number): {
+  switchSession(
+    handle: string,
+    index: number
+  ): {
     id: string;
     name: string;
     workspace: string;

@@ -72,9 +72,7 @@ describe("createStdioJsonRpc", () => {
       '{"id":3,"error":{"code":-32001,"message":"resume failed"}}\n'
     );
 
-    await expect(responsePromise).rejects.toThrow(
-      "JSON-RPC -32001: resume failed"
-    );
+    await expect(responsePromise).rejects.toThrow("JSON-RPC -32001: resume failed");
   });
 
   test("forwards notification messages to the notification handler", async () => {
