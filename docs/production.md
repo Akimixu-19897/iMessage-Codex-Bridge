@@ -74,6 +74,20 @@ tail -f logs/bridge.out.log logs/bridge.err.log
 | stdout | `logs/bridge.out.log`      |
 | stderr | `logs/bridge.err.log`      |
 
+## 防止睡眠断线
+
+生产启动脚本默认设置：
+
+```bash
+BRIDGE_PREVENT_SLEEP=1
+```
+
+这会用 `caffeinate -i` 包住 bridge 进程，阻止 macOS 因空闲进入系统睡眠，但不强制点亮屏幕。这样屏幕可以关闭，iMessage、`imsg watch` 和 `codex app-server` 仍能继续运行。
+
+如果你临时不想阻止睡眠，可以把 `deploy/launchd/com.akimixu.imessage-codex-bridge.plist` 里的 `BRIDGE_PREVENT_SLEEP` 改成 `0`，然后重启服务。
+
+当前机器的电源设置也会影响稳定性。建议生产运行时保持接电；如果使用电池，macOS 仍可能因为低电量、合盖或系统策略进入更深睡眠。
+
 ## 为什么不用 Docker
 
 Docker Desktop 的 Linux 容器无法直接使用 macOS Messages 数据库、系统自动化权限和当前登录用户的 iMessage 会话。这个 bridge 的关键依赖都在宿主 macOS 用户会话里，放进容器会让 `imsg watch` 和 `imsg send` 这条链路不稳定甚至不可用。

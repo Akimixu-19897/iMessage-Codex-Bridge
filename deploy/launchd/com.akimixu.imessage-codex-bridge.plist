@@ -26,6 +26,8 @@
     <string>/Users/akimixu/Desktop/Projects/imessage-codex-bridge/data/attachments</string>
     <key>BRIDGE_LOG_LEVEL</key>
     <string>info</string>
+    <key>BRIDGE_PREVENT_SLEEP</key>
+    <string>1</string>
   </dict>
 
   <key>RunAtLoad</key>
