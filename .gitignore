@@ -3,7 +3,6 @@ dist/
 coverage/
 .tmp/
 config/bridge.local.yaml
-data/state/
-data/attachments/
+data/
 logs/
 .DS_Store
