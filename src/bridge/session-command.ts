@@ -1,5 +1,8 @@
 export type BridgeSessionCommand =
   | {
+      type: "help";
+    }
+  | {
       type: "new";
       name?: string;
     }
@@ -30,6 +33,10 @@ export function parseBridgeSessionCommand(
 
   if (!trimmed) {
     return null;
+  }
+
+  if (trimmed === "/help" || trimmed === "帮助" || trimmed === "命令") {
+    return { type: "help" };
   }
 
   if (trimmed === "/list" || trimmed === "会话列表") {

@@ -19,6 +19,12 @@ describe("parseBridgeSessionCommand", () => {
   });
 
   test("parses list, current, and switch commands", () => {
+    expect(parseBridgeSessionCommand("/help")).toEqual({
+      type: "help"
+    });
+    expect(parseBridgeSessionCommand("帮助")).toEqual({
+      type: "help"
+    });
     expect(parseBridgeSessionCommand("/list")).toEqual({
       type: "list"
     });

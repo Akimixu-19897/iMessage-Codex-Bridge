@@ -103,6 +103,18 @@ function formatAdminHelp(): string {
     "从白名单移除联系人。移除后该联系人不能再使用 Codex bridge。",
     '示例：/bridge remove "user@example.com"',
     "",
+    "白名单联系人也可使用：",
+    "/new [名称]：新建并切换会话",
+    "/list：查看自己的会话列表",
+    "/current：查看当前会话",
+    "/switch <编号>：切换到指定会话",
+    "/task <内容>：启动后台任务",
+    "/research <目标>：启动 autoresearch 研究任务",
+    "/jobs：查看自己的任务列表",
+    "/status <任务编号>：查看任务状态",
+    "/cancel <任务编号>：取消任务",
+    "/logs <任务编号>：查看任务日志",
+    "",
     "提示：参数里有空格时请用英文引号包起来。"
   ].join("\n");
 }

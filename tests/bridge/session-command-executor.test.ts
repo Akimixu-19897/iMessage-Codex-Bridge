@@ -17,6 +17,31 @@ const TEST_CONFIG = {
 };
 
 describe("createSessionCommandExecutor", () => {
+  test("explains commands available to regular contacts", async () => {
+    const executor = createSessionCommandExecutor({
+      sessionManager: createSessionManager(createInitialBridgeState(TEST_CONFIG)),
+      saveState: async () => {}
+    });
+
+    await expect(
+      executor.execute({
+        handle: "+8613800000000",
+        command: {
+          type: "help"
+        }
+      })
+    ).resolves.toContain("/new [名称]：新建并切换会话");
+
+    await expect(
+      executor.execute({
+        handle: "+8613800000000",
+        command: {
+          type: "help"
+        }
+      })
+    ).resolves.toContain("/task <内容>：启动后台任务");
+  });
+
   test("creates, lists, reads, and switches sessions for one contact", async () => {
     const state = createInitialBridgeState(TEST_CONFIG);
     const sessionManager = createSessionManager(state);

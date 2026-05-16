@@ -42,6 +42,24 @@ describe("createAdminCommandExecutor", () => {
         type: "help"
       })
     ).resolves.toContain("不传 workspace 时，会自动使用默认目录");
+
+    await expect(
+      executor.execute({
+        type: "help"
+      })
+    ).resolves.toContain("白名单联系人也可使用：");
+
+    await expect(
+      executor.execute({
+        type: "help"
+      })
+    ).resolves.toContain("/new [名称]：新建并切换会话");
+
+    await expect(
+      executor.execute({
+        type: "help"
+      })
+    ).resolves.toContain("/task <内容>：启动后台任务");
   });
 
   test("adds contacts, lists contacts, updates workspace, and removes contacts", async () => {

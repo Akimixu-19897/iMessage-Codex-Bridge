@@ -59,6 +59,10 @@ export function createSessionCommandExecutor(
         return params.command.message;
       }
 
+      if (params.command.type === "help") {
+        return formatContactHelp();
+      }
+
       if (params.command.type === "new") {
         const created = options.sessionManager.createSession({
           handle: params.handle,
@@ -98,6 +102,28 @@ export function createSessionCommandExecutor(
       return `已切换到会话 #${params.command.index}：${switchedSession.name}`;
     }
   };
+}
+
+function formatContactHelp(): string {
+  return [
+    "可用命令：",
+    "",
+    "会话：",
+    "/new [名称]：新建并切换会话",
+    "/list：查看自己的会话列表",
+    "/current：查看当前会话",
+    "/switch <编号>：切换到指定会话",
+    "",
+    "任务：",
+    "/task <内容>：启动后台任务",
+    "/research <目标>：启动 autoresearch 研究任务",
+    "/jobs：查看自己的任务列表",
+    "/status <任务编号>：查看任务状态",
+    "/cancel <任务编号>：取消任务",
+    "/logs <任务编号>：查看任务日志",
+    "",
+    "直接发送普通消息：继续当前会话并让 Codex 处理。"
+  ].join("\n");
 }
 
 function formatSessionList(
