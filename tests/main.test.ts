@@ -70,6 +70,10 @@ describe("runMain", () => {
       },
       executablePath: "/opt/homebrew/bin/imsg",
       statePath: expect.stringContaining("data/bridge-state.json"),
+      databasePath: expect.stringContaining("data/bridge.db"),
+      useSqlite: false,
+      jobRetentionDays: undefined,
+      maxCompletedJobs: undefined,
       attachmentDirectory: expect.stringContaining("data/attachments"),
       logLevel: "info"
     });
@@ -79,6 +83,10 @@ describe("runMain", () => {
       executablePath: "/opt/homebrew/bin/imsg",
       contactCount: 1,
       statePath: expect.stringContaining("data/bridge-state.json"),
+      databasePath: expect.stringContaining("data/bridge.db"),
+      useSqlite: false,
+      jobRetentionDays: undefined,
+      maxCompletedJobs: undefined,
       attachmentDirectory: expect.stringContaining("data/attachments"),
       logLevel: "info",
       watchArgs: ["watch", "--json", "--attachments"]
@@ -126,6 +134,10 @@ describe("runMain", () => {
       executablePath: "/opt/homebrew/bin/imsg",
       contactCount: 2,
       statePath: expect.stringContaining("data/bridge-state.json"),
+      databasePath: expect.stringContaining("data/bridge.db"),
+      useSqlite: false,
+      jobRetentionDays: undefined,
+      maxCompletedJobs: undefined,
       attachmentDirectory: expect.stringContaining("data/attachments"),
       logLevel: "info",
       watchArgs: ["watch", "--json", "--attachments"]
@@ -162,6 +174,10 @@ describe("runMain", () => {
       env: {
         BRIDGE_CONFIG_PATH: "/tmp/custom-bridge.yaml",
         BRIDGE_STATE_PATH: "/tmp/custom-state.json",
+        BRIDGE_DB_PATH: "/tmp/custom-bridge.db",
+        BRIDGE_USE_SQLITE: "1",
+        BRIDGE_JOB_RETENTION_DAYS: "7",
+        BRIDGE_MAX_COMPLETED_JOBS: "50",
         BRIDGE_ATTACHMENT_DIR: "/tmp/custom-attachments",
         BRIDGE_LOG_LEVEL: "debug"
       }
@@ -172,11 +188,19 @@ describe("runMain", () => {
       config: expect.any(Object),
       executablePath: "/opt/homebrew/bin/imsg",
       statePath: "/tmp/custom-state.json",
+      databasePath: "/tmp/custom-bridge.db",
+      useSqlite: true,
+      jobRetentionDays: 7,
+      maxCompletedJobs: 50,
       attachmentDirectory: "/tmp/custom-attachments",
       logLevel: "debug"
     });
     expect(JSON.parse(String(log.mock.calls[0]?.[1]))).toMatchObject({
       statePath: "/tmp/custom-state.json",
+      databasePath: "/tmp/custom-bridge.db",
+      useSqlite: true,
+      jobRetentionDays: 7,
+      maxCompletedJobs: 50,
       attachmentDirectory: "/tmp/custom-attachments",
       logLevel: "debug"
     });

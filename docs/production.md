@@ -17,7 +17,7 @@ cd /Users/akimixu/Desktop/Projects/imessage-codex-bridge
 npm run doctor
 ```
 
-如果 `imsg`、`codex`、配置文件、状态目录或 workspace 不可用，脚本会停止安装，避免 launchd 不断拉起一个必然失败的进程。
+如果 `imsg`、`codex`、配置文件、状态目录、SQLite 数据库目录或 workspace 不可用，脚本会停止安装，避免 launchd 不断拉起一个必然失败的进程。
 
 ## 服务管理
 
@@ -66,13 +66,55 @@ tail -f logs/bridge.out.log logs/bridge.err.log
 
 默认生产路径：
 
-| 项目   | 路径                       |
-| ------ | -------------------------- |
-| 配置   | `config/bridge.local.yaml` |
-| 状态   | `data/bridge-state.json`   |
-| 附件   | `data/attachments`         |
-| stdout | `logs/bridge.out.log`      |
-| stderr | `logs/bridge.err.log`      |
+| 项目      | 路径                       |
+| --------- | -------------------------- |
+| 配置      | `config/bridge.local.yaml` |
+| 状态库    | `data/bridge.db`           |
+| JSON 备份 | `data/bridge-state.json`   |
+| 附件      | `data/attachments`         |
+| stdout    | `logs/bridge.out.log`      |
+| stderr    | `logs/bridge.err.log`      |
+
+## SQLite 状态库
+
+生产环境默认启用 SQLite：
+
+```bash
+BRIDGE_USE_SQLITE=1
+BRIDGE_DB_PATH=/Users/akimixu/Desktop/Projects/imessage-codex-bridge/data/bridge.db
+```
+
+`data/bridge-state.json` 在迁移后只作为备份来源保留，正常生产运行不会再持续写大 JSON 状态文件。任务日志会进入 `jobs` / `job_logs` 表，默认清理策略是：
+
+```bash
+BRIDGE_JOB_RETENTION_DAYS=30
+BRIDGE_MAX_COMPLETED_JOBS=200
+```
+
+正式从 JSON 迁移到 SQLite 时，建议按这个顺序操作：
+
+```bash
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.akimixu.imessage-codex-bridge.plist
+cp data/bridge-state.json "data/bridge-state.$(date +%Y%m%d-%H%M%S).backup.json"
+/opt/homebrew/bin/volta run tsx src/migrate-state-cli.ts \
+  --state data/bridge-state.json \
+  --database data/bridge.db \
+  --overwrite
+./scripts/install-launchd.sh
+```
+
+如果要先演练，不要直接操作生产库：
+
+```bash
+mkdir -p .tmp
+cp data/bridge-state.json .tmp/bridge-state.backup.json
+/opt/homebrew/bin/volta run tsx src/migrate-state-cli.ts \
+  --state .tmp/bridge-state.backup.json \
+  --database .tmp/bridge-test.db \
+  --overwrite
+```
+
+回滚到 JSON 模式时，先停止服务，把 `BRIDGE_USE_SQLITE` 改成 `0` 或移除 `BRIDGE_DB_PATH`，再重新安装 launchd。回滚前请确认 `data/bridge-state.json` 是你希望恢复的那一版备份。
 
 ## 防止睡眠断线
 

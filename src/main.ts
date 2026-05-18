@@ -7,6 +7,7 @@ import {
 import { startLocalBridge } from "./bridge/start-local-bridge.js";
 import type { BridgeConfig } from "./config/schema.js";
 import { loadConfig } from "./config/load-config.js";
+import { parseOptionalPositiveInteger } from "./state/retention.js";
 
 const DEFAULT_CONFIG_PATH = new URL("../config/bridge.local.yaml", import.meta.url)
   .pathname;
@@ -14,6 +15,7 @@ const FALLBACK_CONFIG_PATH = new URL("../config/bridge.example.yaml", import.met
   .pathname;
 const DEFAULT_STATE_PATH = new URL("../data/bridge-state.json", import.meta.url)
   .pathname;
+const DEFAULT_DATABASE_PATH = new URL("../data/bridge.db", import.meta.url).pathname;
 const DEFAULT_ATTACHMENT_DIRECTORY = new URL("../data/attachments", import.meta.url)
   .pathname;
 
@@ -25,6 +27,10 @@ type RunMainOptions = {
     config: BridgeConfig;
     executablePath: string;
     statePath: string;
+    databasePath: string;
+    useSqlite: boolean;
+    jobRetentionDays?: number;
+    maxCompletedJobs?: number;
     attachmentDirectory: string;
     logLevel?: BridgeLogLevel;
   }) => Promise<{
@@ -41,6 +47,10 @@ export async function runMain(options: RunMainOptions = {}): Promise<number> {
   const error = options.error ?? console.error;
   const env = options.env ?? process.env;
   const statePath = env.BRIDGE_STATE_PATH ?? DEFAULT_STATE_PATH;
+  const databasePath = env.BRIDGE_DB_PATH ?? DEFAULT_DATABASE_PATH;
+  const useSqlite = env.BRIDGE_USE_SQLITE === "1" || Boolean(env.BRIDGE_DB_PATH);
+  const jobRetentionDays = parseOptionalPositiveInteger(env.BRIDGE_JOB_RETENTION_DAYS);
+  const maxCompletedJobs = parseOptionalPositiveInteger(env.BRIDGE_MAX_COMPLETED_JOBS);
   const attachmentDirectory = env.BRIDGE_ATTACHMENT_DIR ?? DEFAULT_ATTACHMENT_DIRECTORY;
   const logLevel = parseLogLevel(env.BRIDGE_LOG_LEVEL);
   const configPath = await resolveConfigPath(env);
@@ -68,6 +78,10 @@ export async function runMain(options: RunMainOptions = {}): Promise<number> {
     config: result.config,
     executablePath: result.executablePath,
     statePath,
+    databasePath,
+    useSqlite,
+    jobRetentionDays,
+    maxCompletedJobs,
     attachmentDirectory,
     logLevel
   });
@@ -79,6 +93,10 @@ export async function runMain(options: RunMainOptions = {}): Promise<number> {
         executablePath: result.executablePath,
         contactCount: result.config.contacts.length,
         statePath,
+        databasePath,
+        useSqlite,
+        jobRetentionDays,
+        maxCompletedJobs,
         attachmentDirectory,
         logLevel,
         watchArgs: bridge.watchArgs

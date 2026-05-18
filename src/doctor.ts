@@ -23,6 +23,7 @@ export type DoctorResult = {
 type RunDoctorOptions = {
   configPath: string;
   statePath: string;
+  databasePath?: string;
   attachmentDirectory: string;
   loadConfig?: (configPath: string) => Promise<BridgeConfig>;
   detectImsgAvailability?: () => Promise<ImsgAvailability>;
@@ -78,6 +79,15 @@ export async function runDoctor(options: RunDoctorOptions): Promise<DoctorResult
     options.statePath,
     ensureDirectory
   );
+  if (options.databasePath) {
+    await pushDirectoryCheck(
+      checks,
+      "database",
+      dirname(options.databasePath),
+      options.databasePath,
+      ensureDirectory
+    );
+  }
   await pushDirectoryCheck(
     checks,
     "attachments",

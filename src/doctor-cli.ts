@@ -8,6 +8,7 @@ const FALLBACK_CONFIG_PATH = new URL("../config/bridge.example.yaml", import.met
   .pathname;
 const DEFAULT_STATE_PATH = new URL("../data/bridge-state.json", import.meta.url)
   .pathname;
+const DEFAULT_DATABASE_PATH = new URL("../data/bridge.db", import.meta.url).pathname;
 const DEFAULT_ATTACHMENT_DIRECTORY = new URL("../data/attachments", import.meta.url)
   .pathname;
 
@@ -15,6 +16,7 @@ const configPath = await resolveConfigPath();
 const result = await runDoctor({
   configPath,
   statePath: process.env.BRIDGE_STATE_PATH ?? DEFAULT_STATE_PATH,
+  databasePath: process.env.BRIDGE_DB_PATH ?? DEFAULT_DATABASE_PATH,
   attachmentDirectory: process.env.BRIDGE_ATTACHMENT_DIR ?? DEFAULT_ATTACHMENT_DIRECTORY
 });
 

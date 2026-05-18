@@ -14,6 +14,7 @@ import { createAdminCommandExecutor } from "./admin-command-executor.js";
 import { createBridgeApp } from "./bridge-app.js";
 import { createBridgeCodexExecutor } from "./bridge-codex-executor.js";
 import { createJobManager } from "./job-manager.js";
+import { createSqliteJobManager } from "./sqlite-job-manager.js";
 import { createBridgeOutboundDispatcher } from "./bridge-outbound-dispatcher.js";
 import { createSessionCommandExecutor } from "./session-command-executor.js";
 
@@ -27,7 +28,10 @@ type CreateLocalBridgeRuntimeOptions = {
   statePath: string;
   appServerSession: AppServerSession;
   attachmentDirectory?: string;
+  databasePath?: string;
+  useSqlite?: boolean;
   logError?: (...args: unknown[]) => void;
+  saveState?: (state: BridgeState) => Promise<void>;
   sendTextMessage: (params: { to: string; text: string }) => Promise<{
     exitCode: number;
     stdout: string;
@@ -46,10 +50,12 @@ export function createLocalBridgeRuntime(options: CreateLocalBridgeRuntimeOption
       ? options.config.adminHandles
       : options.config.contacts.map((contact) => contact.handle);
   const saveState = () =>
-    saveBridgeState({
-      path: options.statePath,
-      state: options.state
-    });
+    options.saveState
+      ? options.saveState(options.state)
+      : saveBridgeState({
+          path: options.statePath,
+          state: options.state
+        });
   const adminCommandExecutor = createAdminCommandExecutor({
     sessionManager,
     saveState
@@ -58,10 +64,16 @@ export function createLocalBridgeRuntime(options: CreateLocalBridgeRuntimeOption
     sessionManager,
     saveState
   });
-  const jobManager = createJobManager({
-    state: options.state,
-    saveState
-  });
+  const jobManager =
+    options.useSqlite && options.databasePath
+      ? createSqliteJobManager({
+          state: options.state,
+          databasePath: options.databasePath
+        })
+      : createJobManager({
+          state: options.state,
+          saveState
+        });
   void jobManager.recoverInterruptedJobs?.(Date.now());
   const appServerClient = createCodexAppServerClient({
     invokeRequest: (request) =>

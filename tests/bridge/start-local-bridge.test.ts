@@ -1,6 +1,14 @@
+import { access, mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, test, vi } from "vitest";
 
 import { startLocalBridge } from "../../src/bridge/start-local-bridge.js";
+import {
+  initializeSqliteStore,
+  readBridgeStateFromSqlite
+} from "../../src/state/sqlite-store.js";
 
 describe("startLocalBridge", () => {
   test("assembles state loading, app-server host, runtime, watch host, and loop runner", async () => {
@@ -82,6 +90,9 @@ describe("startLocalBridge", () => {
       state,
       statePath: "/tmp/bridge-state.json",
       attachmentDirectory: "/tmp/bridge-attachments",
+      databasePath: undefined,
+      useSqlite: undefined,
+      saveState: expect.any(Function),
       appServerSession,
       sendTextMessage: expect.any(Function)
     });
@@ -348,5 +359,99 @@ describe("startLocalBridge", () => {
         }
       }
     ]);
+  });
+
+  test("uses SQLite repository for runtime saveState when SQLite is enabled", async () => {
+    const tempDirectory = await mkdtemp(join(tmpdir(), "bridge-start-sqlite-"));
+    const databasePath = join(tempDirectory, "bridge.db");
+    const statePath = join(tempDirectory, "bridge-state.json");
+    const config = {
+      rejectionMessage: "请联系管理员开通权限。",
+      messageMergeWindowMs: 5000,
+      contacts: [
+        {
+          handle: "+8613800000000",
+          name: "联系人 A",
+          workspace: "/tmp/workspace-a"
+        }
+      ]
+    };
+    let saveState:
+      | ((
+          state: Awaited<ReturnType<typeof readBridgeStateFromSqlite>>
+        ) => Promise<void>)
+      | undefined;
+    const appServerSession = {
+      request: vi.fn(async () => ({})),
+      close: vi.fn()
+    };
+
+    const runtime = await startLocalBridge({
+      config,
+      executablePath: "/opt/homebrew/bin/imsg",
+      statePath,
+      databasePath,
+      useSqlite: true,
+      createAppServerHost: vi.fn(() => ({
+        start: vi.fn(() => appServerSession)
+      })),
+      createLocalRuntime: vi.fn((options) => {
+        saveState = options.saveState;
+        return {
+          app: {
+            watchArgs: ["watch", "--json"],
+            processImsgChunk: vi.fn(),
+            drainActions: vi.fn(() => []),
+            executeReadyActions: vi.fn(async () => []),
+            dispatchReadyActions: vi.fn(async () => [])
+          },
+          handleCodexNotification: vi.fn()
+        };
+      }),
+      createImsgWatchHost: vi.fn(() => ({
+        start: vi.fn(() => ({
+          close: vi.fn()
+        }))
+      })),
+      createBridgeLoopRunner: vi.fn(() => ({
+        start: vi.fn(() => ({
+          close: vi.fn()
+        }))
+      })),
+      ensureWorkspaceDirectory: vi.fn(async () => {}),
+      sendTextMessage: vi.fn(async () => ({
+        exitCode: 0,
+        stdout: "",
+        stderr: ""
+      }))
+    });
+
+    const database = initializeSqliteStore(databasePath);
+    const state = readBridgeStateFromSqlite(database);
+    database.close();
+    state.processedMessages.push({
+      messageId: "m1",
+      handle: "+8613800000000",
+      receivedAt: 1_000,
+      processedAt: 2_000
+    });
+
+    await saveState?.(state);
+
+    const verifyDatabase = initializeSqliteStore(databasePath);
+    try {
+      expect(readBridgeStateFromSqlite(verifyDatabase).processedMessages).toEqual([
+        {
+          messageId: "m1",
+          handle: "+8613800000000",
+          receivedAt: 1_000,
+          processedAt: 2_000
+        }
+      ]);
+    } finally {
+      verifyDatabase.close();
+      runtime.close();
+    }
+    await expect(access(statePath)).rejects.toThrow();
   });
 });

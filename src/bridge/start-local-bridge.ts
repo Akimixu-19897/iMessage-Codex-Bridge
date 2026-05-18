@@ -2,7 +2,13 @@ import { createAppServerStdioHost } from "../adapters/codex/app-server-stdio-hos
 import { createImsgClient } from "../adapters/imsg/imsg-client.js";
 import { createImsgWatchHost } from "../adapters/imsg/imsg-watch-host.js";
 import type { BridgeConfig } from "../config/schema.js";
-import { loadBridgeState, type BridgeState } from "../state/state-store.js";
+import {
+  createJsonBridgeStateRepository,
+  createSqliteBridgeStateRepository,
+  type BridgeStateRepository
+} from "../state/bridge-state-repository.js";
+import { applyJobRetentionPolicy } from "../state/retention.js";
+import type { BridgeState } from "../state/state-store.js";
 import { createBridgeLoopRunner } from "./bridge-loop-runner.js";
 import { ensureContactWorkspace } from "./contact-workspace.js";
 import { createLocalBridgeRuntime } from "./local-bridge-runtime.js";
@@ -34,6 +40,10 @@ type StartLocalBridgeOptions = {
   config: BridgeConfig;
   executablePath: string;
   statePath: string;
+  databasePath?: string;
+  useSqlite?: boolean;
+  jobRetentionDays?: number;
+  maxCompletedJobs?: number;
   attachmentDirectory?: string;
   logLevel?: "silent" | "info" | "debug";
   ensureWorkspaceDirectory?: (path: string) => Promise<void>;
@@ -41,6 +51,12 @@ type StartLocalBridgeOptions = {
     path: string;
     config: BridgeConfig;
   }) => Promise<BridgeState>;
+  createStateRepository?: (options: {
+    config: BridgeConfig;
+    statePath: string;
+    databasePath?: string;
+    useSqlite?: boolean;
+  }) => BridgeStateRepository;
   createAppServerHost?: (options: {
     onNotification: (notification: { method: string; params?: unknown }) => void;
   }) => AppServerHost;
@@ -49,6 +65,9 @@ type StartLocalBridgeOptions = {
     state: BridgeState;
     statePath: string;
     attachmentDirectory?: string;
+    databasePath?: string;
+    useSqlite?: boolean;
+    saveState?: (state: BridgeState) => Promise<void>;
     appServerSession: AppServerSession;
     sendTextMessage: (params: { to: string; text: string }) => Promise<{
       exitCode: number;
@@ -73,11 +92,29 @@ type StartLocalBridgeOptions = {
 };
 
 export async function startLocalBridge(options: StartLocalBridgeOptions) {
-  const loadState = options.loadBridgeState ?? loadBridgeState;
-  const state = await loadState({
-    path: options.statePath,
-    config: options.config
+  const stateRepository =
+    options.createStateRepository?.({
+      config: options.config,
+      statePath: options.statePath,
+      databasePath: options.databasePath,
+      useSqlite: options.useSqlite
+    }) ??
+    createDefaultStateRepository({
+      config: options.config,
+      statePath: options.statePath,
+      databasePath: options.databasePath,
+      useSqlite: options.useSqlite,
+      loadBridgeState: options.loadBridgeState
+    });
+  const state = await stateRepository.loadSnapshot();
+  const retention = applyJobRetentionPolicy(state, {
+    now: Date.now(),
+    retentionDays: options.jobRetentionDays,
+    maxCompletedJobs: options.maxCompletedJobs
   });
+  if (retention.removedJobs > 0) {
+    await stateRepository.saveSnapshot(state);
+  }
   const ensureWorkspaceDirectory =
     options.ensureWorkspaceDirectory ?? ensureContactWorkspace;
 
@@ -117,6 +154,9 @@ export async function startLocalBridge(options: StartLocalBridgeOptions) {
     state,
     statePath: options.statePath,
     attachmentDirectory: options.attachmentDirectory,
+    databasePath: options.databasePath,
+    useSqlite: options.useSqlite,
+    saveState: (nextState) => stateRepository.saveSnapshot(nextState),
     appServerSession,
     sendTextMessage
   });
@@ -143,6 +183,49 @@ export async function startLocalBridge(options: StartLocalBridgeOptions) {
     close(): void {
       loopSession.close();
       appServerSession.close();
+      stateRepository.close?.();
     }
   };
+}
+
+function createDefaultStateRepository(options: {
+  config: BridgeConfig;
+  statePath: string;
+  databasePath?: string;
+  useSqlite?: boolean;
+  loadBridgeState?: (options: {
+    path: string;
+    config: BridgeConfig;
+  }) => Promise<BridgeState>;
+}): BridgeStateRepository {
+  if (options.useSqlite) {
+    if (!options.databasePath) {
+      throw new Error("启用 SQLite 时必须提供 databasePath");
+    }
+
+    return createSqliteBridgeStateRepository({
+      databasePath: options.databasePath,
+      config: options.config
+    });
+  }
+
+  if (options.loadBridgeState) {
+    return {
+      loadSnapshot: () =>
+        options.loadBridgeState!({
+          path: options.statePath,
+          config: options.config
+        }),
+      saveSnapshot: (state) =>
+        createJsonBridgeStateRepository({
+          path: options.statePath,
+          config: options.config
+        }).saveSnapshot(state)
+    };
+  }
+
+  return createJsonBridgeStateRepository({
+    path: options.statePath,
+    config: options.config
+  });
 }

@@ -7,6 +7,7 @@ describe("runDoctor", () => {
     const result = await runDoctor({
       configPath: "/tmp/bridge.yaml",
       statePath: "/tmp/bridge-state.json",
+      databasePath: "/tmp/bridge.db",
       attachmentDirectory: "/tmp/attachments",
       loadConfig: vi.fn(async () => ({
         rejectionMessage: "请联系管理员开通权限。",
@@ -48,6 +49,11 @@ describe("runDoctor", () => {
         name: "state",
         ok: true,
         detail: "/tmp/bridge-state.json"
+      },
+      {
+        name: "database",
+        ok: true,
+        detail: "/tmp/bridge.db"
       },
       {
         name: "attachments",

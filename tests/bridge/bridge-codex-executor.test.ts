@@ -1,7 +1,12 @@
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, test, vi } from "vitest";
 
 import { createBridgeCodexExecutor } from "../../src/bridge/bridge-codex-executor.js";
 import { createJobManager } from "../../src/bridge/job-manager.js";
+import { createSqliteJobManager } from "../../src/bridge/sqlite-job-manager.js";
 import { createInitialBridgeState } from "../../src/state/state-store.js";
 
 const TEST_CONFIG = {
@@ -573,5 +578,106 @@ describe("createBridgeCodexExecutor", () => {
       threadId: "thread-1",
       turnId: "turn-1"
     });
+  });
+
+  test("runs job query commands against the SQLite job manager", async () => {
+    const tempDirectory = await mkdtemp(join(tmpdir(), "bridge-executor-sqlite-"));
+    const state = createInitialBridgeState(TEST_CONFIG);
+    const jobManager = createSqliteJobManager({
+      state,
+      databasePath: join(tempDirectory, "bridge.db")
+    });
+    const executor = createBridgeCodexExecutor({
+      jobManager,
+      submitTextTurn: vi.fn(),
+      waitForTurn: vi.fn()
+    });
+    const job = await jobManager.createJob({
+      handle: "+8613800000000",
+      sessionId: null,
+      mode: "background",
+      workflow: "generic",
+      prompt: "跑任务",
+      title: "跑任务",
+      sourceMessageIds: ["m1"],
+      attachmentPaths: [],
+      now: 1_000
+    });
+    await jobManager.markRunning({
+      handle: job.handle,
+      jobId: job.id,
+      now: 2_000,
+      stage: "正在执行"
+    });
+
+    await expect(
+      executor.execute(
+        [
+          {
+            type: "job_command",
+            handle: "+8613800000000",
+            command: {
+              type: "jobs"
+            }
+          },
+          {
+            type: "job_command",
+            handle: "+8613800000000",
+            command: {
+              type: "status",
+              jobId: "job-1"
+            }
+          },
+          {
+            type: "job_command",
+            handle: "+8613800000000",
+            command: {
+              type: "logs",
+              jobId: "job-1"
+            }
+          },
+          {
+            type: "job_command",
+            handle: "+8613800000000",
+            command: {
+              type: "cancel",
+              jobId: "job-1"
+            }
+          }
+        ],
+        3_000
+      )
+    ).resolves.toEqual([
+      {
+        type: "reply",
+        handle: "+8613800000000",
+        message: "任务列表：\n#job-1 [running] 跑任务",
+        threadId: "job-command",
+        turnId: "job-command"
+      },
+      {
+        type: "reply",
+        handle: "+8613800000000",
+        message: expect.stringContaining("状态：running"),
+        threadId: "job-command",
+        turnId: "job-command"
+      },
+      {
+        type: "reply",
+        handle: "+8613800000000",
+        message: expect.stringContaining("正在执行"),
+        threadId: "job-command",
+        turnId: "job-command"
+      },
+      {
+        type: "reply",
+        handle: "+8613800000000",
+        message: "任务 #job-1 已取消",
+        threadId: "job-command",
+        turnId: "job-command"
+      }
+    ]);
+    expect(jobManager.getJob("+8613800000000", "job-1").status).toBe("cancelled");
+    jobManager.close();
   });
 });

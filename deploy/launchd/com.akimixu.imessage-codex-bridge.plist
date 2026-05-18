@@ -22,10 +22,18 @@
     <string>/Users/akimixu/Desktop/Projects/imessage-codex-bridge/config/bridge.local.yaml</string>
     <key>BRIDGE_STATE_PATH</key>
     <string>/Users/akimixu/Desktop/Projects/imessage-codex-bridge/data/bridge-state.json</string>
+    <key>BRIDGE_USE_SQLITE</key>
+    <string>1</string>
+    <key>BRIDGE_DB_PATH</key>
+    <string>/Users/akimixu/Desktop/Projects/imessage-codex-bridge/data/bridge.db</string>
     <key>BRIDGE_ATTACHMENT_DIR</key>
     <string>/Users/akimixu/Desktop/Projects/imessage-codex-bridge/data/attachments</string>
     <key>BRIDGE_LOG_LEVEL</key>
     <string>info</string>
+    <key>BRIDGE_JOB_RETENTION_DAYS</key>
+    <string>30</string>
+    <key>BRIDGE_MAX_COMPLETED_JOBS</key>
+    <string>200</string>
     <key>BRIDGE_PREVENT_SLEEP</key>
     <string>1</string>
   </dict>

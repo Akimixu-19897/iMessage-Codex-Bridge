@@ -109,18 +109,22 @@ npm run check
 npm run doctor
 ```
 
-`doctor` 会检查配置文件、`imsg`、`codex`、状态目录、图片暂存目录和联系人 workspace 是否可用。
+`doctor` 会检查配置文件、`imsg`、`codex`、状态目录、SQLite 数据库目录、图片暂存目录和联系人 workspace 是否可用。
 
 ### 4. 可选运行参数
 
 可以用环境变量覆盖默认运行路径和日志级别：
 
-| 环境变量                | 说明                                |
-| ----------------------- | ----------------------------------- |
-| `BRIDGE_CONFIG_PATH`    | 覆盖配置文件路径                    |
-| `BRIDGE_STATE_PATH`     | 覆盖状态文件路径                    |
-| `BRIDGE_ATTACHMENT_DIR` | 覆盖图片暂存目录                    |
-| `BRIDGE_LOG_LEVEL`      | 日志级别：`info`、`debug`、`silent` |
+| 环境变量                    | 说明                                     |
+| --------------------------- | ---------------------------------------- |
+| `BRIDGE_CONFIG_PATH`        | 覆盖配置文件路径                         |
+| `BRIDGE_STATE_PATH`         | 覆盖状态文件路径                         |
+| `BRIDGE_USE_SQLITE`         | 是否使用 SQLite：生产默认 `1`            |
+| `BRIDGE_DB_PATH`            | 覆盖 SQLite 数据库路径                   |
+| `BRIDGE_ATTACHMENT_DIR`     | 覆盖图片暂存目录                         |
+| `BRIDGE_LOG_LEVEL`          | 日志级别：`info`、`debug`、`silent`      |
+| `BRIDGE_JOB_RETENTION_DAYS` | 已结束任务保留天数，默认 `30`            |
+| `BRIDGE_MAX_COMPLETED_JOBS` | 每个联系人保留的已结束任务数，默认 `200` |
 
 默认 `info` 日志会隐藏消息正文和回复正文，只输出字节数、脱敏 handle、退出码和消息长度。需要排查原始 `imsg` 输入时，可临时使用：
 
@@ -135,6 +139,8 @@ bridge ready: {
   "executablePath": ".../imsg",
   "contactCount": 2,
   "statePath": ".../data/bridge-state.json",
+  "databasePath": ".../data/bridge.db",
+  "useSqlite": true,
   "attachmentDirectory": ".../data/attachments",
   "logLevel": "info",
   "watchArgs": ["watch", "--json", "--attachments"]
@@ -145,9 +151,21 @@ bridge ready: {
 
 默认运行数据位于仓库内：
 
-- 状态文件：`data/bridge-state.json`
+- SQLite 状态库：`data/bridge.db`
+- JSON 状态备份/迁移来源：`data/bridge-state.json`
 - 图片暂存目录：`data/attachments`
 - 联系人默认 workspace 根目录：`~/.imessage-codex-agent/workspace`
+
+生产环境默认使用 SQLite。首次从旧 JSON 状态迁移时，先停止 launchd，备份 JSON，再运行：
+
+```bash
+/opt/homebrew/bin/volta run tsx src/migrate-state-cli.ts \
+  --state data/bridge-state.json \
+  --database data/bridge.db \
+  --overwrite
+```
+
+想先演练可以把输出库写到 `.tmp/bridge-test.db`，确认 contacts、jobs、job_logs 数量正常后再切生产。
 
 bridge 启动时会：
 
@@ -186,7 +204,7 @@ bridge 启动时会：
 
 - `allow` 不传 `workspace` 时，会自动创建 `~/.imessage-codex-agent/workspace/<handle>`
 - `workspace` 会立即更新联系人默认目录，并让当前会话下次在新目录启动
-- 所有动态修改都会直接写入 `data/bridge-state.json`
+- 所有动态修改都会写入当前启用的状态存储；生产默认写入 `data/bridge.db`
 - `name` 或 `workspace` 含空格时请加英文引号
 
 示例：
@@ -306,7 +324,7 @@ pnpm build
 - 目前只支持**图片理解输入**，不支持图片生成或图片回传
 - 当前配置加载规则是“`bridge.local.yaml` 优先，`bridge.example.yaml` 回退”，但还没有做更正式的多环境配置体系
 - `imsg send` 失败会记日志，但不会做自动重试队列
-- 状态文件损坏时会直接报错退出，需要人工修复 `data/bridge-state.json`
+- SQLite 状态库损坏或迁移失败时需要先停服务，再用最近的 `bridge-state.json` 备份重新迁移
 - 长任务能力已完成代码与自动化验证，但还建议再做一次真实手机端到端长跑验收
 
 ## 适合什么场景
